@@ -17,6 +17,16 @@ export interface AuthPayload {
   [key: string]: unknown;
 }
 
+export type AdminRole = "super_admin" | "ops_admin" | "support_agent";
+
+export interface AdminAuthPayload {
+  sub: string; // admin user id
+  email: string;
+  role: "admin";
+  adminRole: AdminRole;
+  [key: string]: unknown;
+}
+
 export type QueueStatus =
   | "waiting"
   | "called"

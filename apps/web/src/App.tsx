@@ -7,6 +7,7 @@ import { DashboardPage } from "./pages/DashboardPage";
 import { QueuePage } from "./pages/QueuePage";
 import { StaffPage } from "./pages/StaffPage";
 import { PrivacyPage } from "./pages/PrivacyPage";
+import { BookingPage } from "./pages/BookingPage";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { owner, loading } = useAuth();
@@ -35,6 +36,7 @@ export function App() {
         }
       />
       <Route path="/q/:slug" element={<QueuePage />} />
+      <Route path="/book/:slug" element={<BookingPage />} />
       <Route path="/staff/:slug" element={<StaffPage />} />
       <Route path="/privacy" element={<PrivacyPage />} />
       <Route path="*" element={<Navigate to="/" replace />} />

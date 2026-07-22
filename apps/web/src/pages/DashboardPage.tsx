@@ -148,7 +148,14 @@ function ShopManager({ shop, onChange }: { shop: Shop; onChange: () => void }) {
         <div className="flex items-center gap-3">
           <ShopAvatar shop={shop} size={44} />
           <div>
-            <h1 className="text-2xl font-extrabold text-brand-800">{shop.name}</h1>
+            <h1 className="text-2xl font-extrabold text-brand-800">
+              {shop.name}
+              {shop.subscription_tier === "pro" && (
+                <span className="ms-2 align-middle rounded-full bg-gradient-to-l from-gold-400 to-gold-500 px-2 py-0.5 text-xs font-extrabold text-brand-900">
+                  Pro
+                </span>
+              )}
+            </h1>
             {shop.tagline && (
               <p className="text-sm text-slate-500">{shop.tagline}</p>
             )}

@@ -7,6 +7,9 @@ import { locationRoutes } from "./routes/locations";
 import { queueRoutes } from "./routes/queue";
 import { staffRoutes } from "./routes/staff";
 import { assetRoutes } from "./routes/assets";
+import { subscriptionRoutes } from "./routes/subscription";
+import { bookingRoutes } from "./routes/booking";
+import { adminRoutes } from "./routes/admin";
 
 export { ShopQueue } from "./durable-objects/ShopQueue";
 
@@ -31,9 +34,12 @@ app.get("/health", (c) => c.json({ ok: true, service: "saf-api" }));
 app.route("/auth", authRoutes);
 app.route("/staff", staffRoutes);
 app.route("/shops", shopRoutes);
+app.route("/shops", subscriptionRoutes);
 app.route("/locations", locationRoutes);
 app.route("/queue", queueRoutes);
 app.route("/assets", assetRoutes);
+app.route("/", bookingRoutes);
+app.route("/admin", adminRoutes);
 
 app.notFound((c) => c.json({ error: "المسار غير موجود" }, 404));
 app.onError((err, c) => {

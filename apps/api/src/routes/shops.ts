@@ -1,14 +1,43 @@
 import { Hono } from "hono";
 import type { AppEnv } from "../lib/http";
 import { requireFields } from "../lib/http";
-import { generateId, generateSlug } from "../lib/slug";
+import { generateId, generateSlug, normalizeCustomSlug } from "../lib/slug";
 import { hashPassword } from "../lib/crypto";
 import { isWithinWorkingHours } from "../lib/hours";
+import {
+  canUseTheme,
+  isPro,
+  staffLimit,
+} from "../lib/subscription";
 import { requireAuth } from "../middleware/auth";
 
 export const shopRoutes = new Hono<AppEnv>();
 
 const SHOP_TYPES = ["barber", "restaurant", "clinic", "salon", "other"];
+
+// التحقق من توفّر slug مخصص (قبل مسار /:slug).
+shopRoutes.get("/slug-available", requireAuth, async (c) => {
+  const raw = c.req.query("slug") ?? "";
+  const slug = normalizeCustomSlug(raw);
+  if (!slug) {
+    return c.json({ available: false, reason: "صيغة الرابط غير صالحة" });
+  }
+  const reserved = await c.env.DB.prepare(
+    "SELECT slug FROM reserved_slugs WHERE slug = ?",
+  )
+    .bind(slug)
+    .first();
+  if (reserved) {
+    return c.json({ available: false, reason: "هذا الرابط محجوز" });
+  }
+  const clash = await c.env.DB.prepare("SELECT id FROM shops WHERE slug = ?")
+    .bind(slug)
+    .first();
+  return c.json({
+    available: !clash,
+    reason: clash ? "الرابط مستخدم بالفعل" : null,
+  });
+});
 
 // إنشاء محل جديد (يبدأ دائمًا على الباقة المجانية برابط عشوائي).
 shopRoutes.post("/", requireAuth, async (c) => {
@@ -74,7 +103,9 @@ shopRoutes.get("/:slug", async (c) => {
   const slug = c.req.param("slug");
   const shop = await c.env.DB.prepare(
     `SELECT id, name, slug, shop_type, theme_id, theme_custom, logo_url, tagline,
-            is_active, is_accepting_queue, working_hours, subscription_tier, avg_service_seconds
+            is_active, is_accepting_queue, working_hours, subscription_tier,
+            subscription_status, subscription_renews_at, hide_powered_by,
+            avg_service_seconds, suspended_at
      FROM shops WHERE slug = ?`,
   )
     .bind(slug)
@@ -85,9 +116,15 @@ shopRoutes.get("/:slug", async (c) => {
       is_accepting_queue: number;
       working_hours: string | null;
       subscription_tier: string;
+      subscription_status: string;
+      subscription_renews_at: number | null;
+      hide_powered_by: number | null;
+      suspended_at: number | null;
     }>();
 
-  if (!shop) return c.json({ error: "المحل غير موجود" }, 404);
+  if (!shop || shop.suspended_at) {
+    return c.json({ error: "المحل غير موجود" }, 404);
+  }
 
   const withinHours = isWithinWorkingHours(shop.working_hours);
   const isOpen =
@@ -99,7 +136,17 @@ shopRoutes.get("/:slug", async (c) => {
     closedReason = "المحل مغلق حاليًا خارج ساعات العمل";
   }
 
-  return c.json({ shop: { ...shop, isOpen, closedReason } });
+  const pro = isPro(shop);
+  return c.json({
+    shop: {
+      ...shop,
+      isOpen,
+      closedReason,
+      is_pro: pro,
+      hide_powered_by: pro && shop.hide_powered_by === 1 ? 1 : 0,
+      booking_enabled: pro,
+    },
+  });
 });
 
 // تحديث المحل (تبديل استقبال العملاء، الثيم، ساعات العمل...).
@@ -109,10 +156,16 @@ shopRoutes.patch("/:id", requireAuth, async (c) => {
   const body = await c.req.json().catch(() => ({}));
 
   const shop = await c.env.DB.prepare(
-    "SELECT id FROM shops WHERE id = ? AND owner_id = ?",
+    `SELECT id, subscription_tier, subscription_status, subscription_renews_at
+     FROM shops WHERE id = ? AND owner_id = ?`,
   )
     .bind(id, auth.sub)
-    .first();
+    .first<{
+      id: string;
+      subscription_tier: string;
+      subscription_status: string;
+      subscription_renews_at: number | null;
+    }>();
   if (!shop) return c.json({ error: "المحل غير موجود" }, 404);
 
   const updates: string[] = [];
@@ -126,6 +179,12 @@ shopRoutes.patch("/:id", requireAuth, async (c) => {
     values.push(body.name);
   }
   if (typeof body.theme_id === "string") {
+    if (!canUseTheme(shop, body.theme_id)) {
+      return c.json(
+        { error: "هذا القالب متاح في باقة Pro فقط", code: "pro_required" },
+        403,
+      );
+    }
     updates.push("theme_id = ?");
     values.push(body.theme_id);
   }
@@ -156,6 +215,44 @@ shopRoutes.patch("/:id", requireAuth, async (c) => {
     }
     updates.push("tagline = ?");
     values.push(tagline || null);
+  }
+  if (typeof body.slug === "string") {
+    if (!isPro(shop)) {
+      return c.json(
+        { error: "الرابط المخصص متاح في باقة Pro فقط", code: "pro_required" },
+        403,
+      );
+    }
+    const slug = normalizeCustomSlug(body.slug);
+    if (!slug) {
+      return c.json({ error: "صيغة الرابط غير صالحة (3–30 حرفًا، a-z و 0-9 و -)" }, 400);
+    }
+    const reserved = await c.env.DB.prepare(
+      "SELECT slug FROM reserved_slugs WHERE slug = ?",
+    )
+      .bind(slug)
+      .first();
+    if (reserved) return c.json({ error: "هذا الرابط محجوز" }, 409);
+    const clash = await c.env.DB.prepare(
+      "SELECT id FROM shops WHERE slug = ? AND id != ?",
+    )
+      .bind(slug, id)
+      .first();
+    if (clash) return c.json({ error: "الرابط مستخدم بالفعل" }, 409);
+    updates.push("slug = ?");
+    values.push(slug);
+    updates.push("slug_type = ?");
+    values.push("custom");
+  }
+  if (typeof body.hide_powered_by === "boolean") {
+    if (!isPro(shop)) {
+      return c.json(
+        { error: "إخفاء علامة صفّ متاح في باقة Pro فقط", code: "pro_required" },
+        403,
+      );
+    }
+    updates.push("hide_powered_by = ?");
+    values.push(body.hide_powered_by ? 1 : 0);
   }
 
   if (updates.length === 0) {
@@ -289,7 +386,18 @@ shopRoutes.get("/:id/staff", requireAuth, async (c) => {
 shopRoutes.post("/:id/staff", requireAuth, async (c) => {
   const auth = c.get("auth");
   const shopId = c.req.param("id");
-  if (!(await ownsShop(c, auth.sub, shopId))) {
+  const shop = await c.env.DB.prepare(
+    `SELECT id, subscription_tier, subscription_status, subscription_renews_at
+     FROM shops WHERE id = ? AND owner_id = ?`,
+  )
+    .bind(shopId, auth.sub)
+    .first<{
+      id: string;
+      subscription_tier: string;
+      subscription_status: string;
+      subscription_renews_at: number | null;
+    }>();
+  if (!shop) {
     return c.json({ error: "غير مصرّح" }, 403);
   }
   const body = await c.req.json().catch(() => ({}));
@@ -297,6 +405,24 @@ shopRoutes.post("/:id/staff", requireAuth, async (c) => {
   if (err) return c.json({ error: err }, 400);
   if (!/^\d{4,6}$/.test(String(body.pin))) {
     return c.json({ error: "رمز PIN يجب أن يكون 4 إلى 6 أرقام" }, 400);
+  }
+
+  const countRow = await c.env.DB.prepare(
+    "SELECT COUNT(*) AS n FROM staff WHERE shop_id = ?",
+  )
+    .bind(shopId)
+    .first<{ n: number }>();
+  const limit = staffLimit(shop);
+  if ((countRow?.n ?? 0) >= limit) {
+    return c.json(
+      {
+        error: isPro(shop)
+          ? `وصلت للحد الأقصى (${limit} موظفين)`
+          : `الباقة المجانية تسمح بموظف واحد — رقِّ لـ Pro لإضافة المزيد`,
+        code: "staff_limit",
+      },
+      403,
+    );
   }
 
   const id = generateId("staff");
