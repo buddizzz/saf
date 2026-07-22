@@ -11,10 +11,10 @@ import {
 } from "../lib/subscription";
 import {
   distanceKm,
-  geocodeAddress,
+  geocodeFromKsaDataset,
   parseCoords,
-  reverseGeocode,
-} from "../lib/osm";
+  reverseGeocodeKsa,
+} from "../lib/ksa-geo";
 import { listNewInArea, listPastCustomers } from "../lib/visits";
 import { requireAuth } from "../middleware/auth";
 
@@ -39,63 +39,45 @@ async function resolveShopGeo(
   osm_display_name: string | null;
   location_source: string;
   district_name_free: string | null;
+  city_id?: string | null;
+  district_id?: string | null;
+  region_id?: string | null;
 }> {
   const gps = parseCoords(input.lat, input.lng);
   const districtFree = input.district_name_free ?? null;
 
   if (gps) {
-    const osm = await reverseGeocode(gps.lat, gps.lng);
+    const place = await reverseGeocodeKsa(db, gps.lat, gps.lng);
     return {
       lat: gps.lat,
       lng: gps.lng,
-      osm_place_id: osm?.place_id ?? null,
-      osm_display_name: osm?.display_name ?? null,
+      osm_place_id: place?.place_id ?? null,
+      osm_display_name: place?.display_name ?? null,
       location_source: "gps",
-      district_name_free: districtFree || osm?.district_name || null,
+      district_name_free: districtFree || place?.district_name || null,
+      city_id: place?.city_id ?? input.city_id ?? null,
+      district_id: place?.district_id ?? input.district_id ?? null,
+      region_id: place?.region_id ?? null,
     };
   }
 
-  let cityName: string | null = null;
-  let districtName: string | null = districtFree;
-  let countryName: string | null = input.country_code ?? null;
-
-  if (input.city_id) {
-    const city = await db
-      .prepare("SELECT name_ar, name_en FROM cities WHERE id = ?")
-      .bind(input.city_id)
-      .first<{ name_ar: string; name_en: string }>();
-    cityName = city?.name_ar ?? city?.name_en ?? null;
-  }
-  if (input.district_id) {
-    const district = await db
-      .prepare("SELECT name_ar, name_en FROM districts WHERE id = ?")
-      .bind(input.district_id)
-      .first<{ name_ar: string; name_en: string }>();
-    districtName = district?.name_ar ?? district?.name_en ?? districtName;
-  }
-  if (input.country_code) {
-    const country = await db
-      .prepare("SELECT name_ar, name_en FROM countries WHERE code = ?")
-      .bind(input.country_code)
-      .first<{ name_ar: string; name_en: string }>();
-    countryName = country?.name_ar ?? country?.name_en ?? input.country_code;
-  }
-
-  const osm = await geocodeAddress({
-    country: countryName,
-    city: cityName,
-    district: districtName,
-    freeDistrict: districtFree,
+  const place = await geocodeFromKsaDataset(db, {
+    city_id: input.city_id,
+    district_id: input.district_id,
+    district_name_free: districtFree,
   });
 
-  if (osm) {
+  if (place) {
     return {
-      lat: osm.lat,
-      lng: osm.lng,
-      osm_place_id: osm.place_id,
-      osm_display_name: osm.display_name,
-      location_source: "osm_geocode",
-      district_name_free: districtFree || osm.district_name || null,
+      lat: place.lat,
+      lng: place.lng,
+      osm_place_id: place.place_id,
+      osm_display_name: place.display_name,
+      location_source: "ksa_dataset",
+      district_name_free: districtFree || place.district_name || null,
+      city_id: place.city_id ?? input.city_id ?? null,
+      district_id: place.district_id ?? input.district_id ?? null,
+      region_id: place.region_id ?? null,
     };
   }
 
@@ -106,6 +88,8 @@ async function resolveShopGeo(
     osm_display_name: null,
     location_source: "none",
     district_name_free: districtFree,
+    city_id: input.city_id ?? null,
+    district_id: input.district_id ?? null,
   };
 }
 
@@ -233,6 +217,8 @@ shopRoutes.post("/", requireAuth, async (c) => {
   const geo = await resolveShopGeo(c.env.DB, body);
   const now = Math.floor(Date.now() / 1000);
   const id = generateId("shop");
+  const cityId = body.city_id ?? geo.city_id ?? null;
+  const districtId = body.district_id ?? geo.district_id ?? null;
   await c.env.DB.prepare(
     `INSERT INTO shops
       (id, owner_id, name, slug, shop_type, country_code, city_id, district_id,
@@ -247,8 +233,8 @@ shopRoutes.post("/", requireAuth, async (c) => {
       slug,
       body.shop_type,
       body.country_code,
-      body.city_id ?? null,
-      body.district_id ?? null,
+      cityId,
+      districtId,
       geo.district_name_free,
       geo.lat,
       geo.lng,

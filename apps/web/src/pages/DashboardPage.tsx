@@ -338,6 +338,7 @@ interface Location {
   id: string;
   name_ar: string;
   name_en: string;
+  distance_km?: number | null;
 }
 
 function CreateShopForm({
@@ -352,30 +353,55 @@ function CreateShopForm({
     name: "",
     shop_type: "salon",
     country_code: "SA",
+    region_id: "",
     city_id: "",
     district_id: "",
   });
+  const [regions, setRegions] = useState<Location[]>([]);
   const [cities, setCities] = useState<Location[]>([]);
   const [districts, setDistricts] = useState<Location[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [geoHint, setGeoHint] = useState<string | null>(null);
+  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(
+    null,
+  );
 
   useEffect(() => {
-    apiFetch<{ cities: Location[] }>(
-      `/locations/cities?country=${form.country_code}`,
-    ).then((r) => setCities(r.cities));
+    void readDeviceCoords(4000).then((c) => {
+      if (c) setCoords(c);
+    });
+  }, []);
+
+  useEffect(() => {
+    apiFetch<{ regions: Location[] }>(
+      `/locations/regions?country=${form.country_code}`,
+    ).then((r) => setRegions(r.regions));
   }, [form.country_code]);
+
+  useEffect(() => {
+    if (!form.region_id) {
+      setCities([]);
+      return;
+    }
+    const geoQs =
+      coords != null ? `&lat=${coords.lat}&lng=${coords.lng}` : "";
+    apiFetch<{ cities: Location[] }>(
+      `/locations/cities?country=${form.country_code}&region=${form.region_id}${geoQs}`,
+    ).then((r) => setCities(r.cities));
+  }, [form.country_code, form.region_id, coords]);
 
   useEffect(() => {
     if (!form.city_id) {
       setDistricts([]);
       return;
     }
+    const geoQs =
+      coords != null ? `&lat=${coords.lat}&lng=${coords.lng}` : "";
     apiFetch<{ districts: Location[] }>(
-      `/locations/districts?city=${form.city_id}`,
+      `/locations/districts?city=${form.city_id}${geoQs}`,
     ).then((r) => setDistricts(r.districts));
-  }, [form.city_id]);
+  }, [form.city_id, coords]);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -383,9 +409,9 @@ function CreateShopForm({
     setError(null);
     setGeoHint(t("location.locating"));
     try {
-      const coords = await readDeviceCoords();
+      const live = coords ?? (await readDeviceCoords());
       setGeoHint(
-        coords ? t("location.gpsCaptured") : t("location.osmWillGeocode"),
+        live ? t("location.gpsCaptured") : t("location.ksaWillGeocode"),
       );
       await apiFetch("/shops", {
         method: "POST",
@@ -396,8 +422,8 @@ function CreateShopForm({
           country_code: form.country_code,
           city_id: form.city_id || null,
           district_id: form.district_id || null,
-          lat: coords?.lat ?? null,
-          lng: coords?.lng ?? null,
+          lat: live?.lat ?? null,
+          lng: live?.lng ?? null,
         }),
       });
       onCreated();
@@ -444,6 +470,29 @@ function CreateShopForm({
         </select>
       </div>
       <div>
+        <label className="label">{t("dashboard.region")}</label>
+        <select
+          className="field"
+          value={form.region_id}
+          onChange={(e) =>
+            setForm({
+              ...form,
+              region_id: e.target.value,
+              city_id: "",
+              district_id: "",
+            })
+          }
+          required
+        >
+          <option value="">—</option>
+          {regions.map((region) => (
+            <option key={region.id} value={region.id}>
+              {region.name_ar}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div>
         <label className="label">{t("dashboard.city")}</label>
         <select
           className="field"
@@ -451,11 +500,14 @@ function CreateShopForm({
           onChange={(e) =>
             setForm({ ...form, city_id: e.target.value, district_id: "" })
           }
+          required
+          disabled={!form.region_id}
         >
           <option value="">—</option>
           {cities.map((city) => (
             <option key={city.id} value={city.id}>
               {city.name_ar}
+              {city.distance_km != null ? ` · ${city.distance_km} كم` : ""}
             </option>
           ))}
         </select>
@@ -472,6 +524,7 @@ function CreateShopForm({
             {districts.map((d) => (
               <option key={d.id} value={d.id}>
                 {d.name_ar}
+                {d.distance_km != null ? ` · ${d.distance_km} كم` : ""}
               </option>
             ))}
           </select>

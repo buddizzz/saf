@@ -9,7 +9,8 @@
     "deploy": "wrangler deploy",
     "db:migrate": "wrangler d1 migrations apply saf-db --local",
     "db:migrate:remote": "wrangler d1 migrations apply saf-db --remote",
-    "db:seed": "wrangler d1 execute saf-db --local --file=./seed/locations.sql",
+    "db:seed": "wrangler d1 execute saf-db --local --file=./seed/ksa_locations.sql",
+    "db:seed:generate": "python3 ./seed/generate_ksa_locations.py",
     "typecheck": "tsc --noEmit",
     "lint": "eslint \"src/**/*.ts\""
   },

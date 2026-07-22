@@ -75,3 +75,17 @@ pnpm dev
 - **Pro:** تجربة 14 يومًا أو تفعيل يدوي من إعدادات المحل (بوابة الدفع لاحقًا). يفتح الحجز عن بُعد، القوالب الكاملة، الرابط المخصص، وإخفاء الإعلان.
 - **حجز عن بُعد:** `/book/:slug` للعملاء + إعداد التوفّر من لوحة المالك (Pro).
 - **لوحة المنصة:** تطبيق منفصل على المنفذ 5174 (`pnpm dev:admin`) — bootstrap لأول Super Admin ثم إدارة المحلات/التدقيق.
+
+## المواقع (السعودية)
+
+قوائم المناطق/المدن/الأحياء وإحداثيات المراكز مأخوذة من
+[homaily/Saudi-Arabia-Regions-Cities-and-Districts](https://github.com/homaily/Saudi-Arabia-Regions-Cities-and-Districts)
+(بيانات عامة من [maps.address.gov.sa](https://maps.address.gov.sa/)، رخصة GPL-2.0).
+
+```bash
+pnpm --filter @saf/api db:migrate
+pnpm --filter @saf/api db:seed            # يطبّق seed/ksa_locations.sql
+pnpm --filter @saf/api db:seed:generate   # إعادة التوليد من المستودع عند الحاجة
+```
+
+الترميز الجغرافي للمحل يستخدم مركز الحي/المدينة من هذه البيانات، مع GPS اختياري من المتصفح لترتيب الأقرب ومطابقة الحي.
