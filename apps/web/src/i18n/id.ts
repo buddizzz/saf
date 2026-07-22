@@ -23,6 +23,7 @@ export const id: Translations = {
     feature2Body: "Tautan dan kode QR yang siap cetak untuk setiap toko.",
     feature3Title: "Peringatan cerdas",
     feature3Body: "Suara dan getaran saat giliran pelanggan mendekat.",
+    featuresKicker: "Mengapa SAF?",
     newBadgeTag: "Baru",
     newBadgeText: "Identitas merek lengkap dengan logo dan warna Anda",
     statsTitle: "Angka yang berbicara sendiri",

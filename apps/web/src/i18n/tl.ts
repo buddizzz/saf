@@ -23,6 +23,7 @@ export const tl: Translations = {
     feature2Body: "Nai-print na link at QR code para sa bawat tindahan.",
     feature3Title: "Matalinong alert",
     feature3Body: "Tunog at vibration kapag papalapit na ang turn ng customer.",
+    featuresKicker: "Bakit SAF?",
     newBadgeTag: "Bago",
     newBadgeText: "Kumpletong brand identity gamit ang logo at kulay mo",
     statsTitle: "Mga numero na nagsasalita para sa kanilang sarili",

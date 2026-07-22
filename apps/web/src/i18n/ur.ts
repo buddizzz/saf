@@ -23,6 +23,7 @@ export const ur: Translations = {
     feature2Body: "ہر دکان کے لیے پرنٹ کے قابل لنک اور QR کوڈ۔",
     feature3Title: "سمارٹ الرٹس",
     feature3Body: "گاہک کی باری قریب آنے پر آواز اور وائبریشن۔",
+    featuresKicker: "صف کیوں؟",
     newBadgeTag: "نیا",
     newBadgeText: "آپ کے لوگو اور رنگوں کے ساتھ مکمل برانڈ شناخت",
     statsTitle: "اعداد جو خود بولتے ہیں",

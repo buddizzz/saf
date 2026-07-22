@@ -120,7 +120,7 @@ export function LandingPage() {
           <Reveal>
             <span className="kicker mb-4">
               <span className="h-px w-8 bg-gold-400" />
-              {t("landing.statsTitle")}
+              {t("landing.featuresKicker")}
             </span>
           </Reveal>
           <div className="mt-8 grid gap-5 md:grid-cols-3">
@@ -142,6 +142,11 @@ export function LandingPage() {
           <div className="grain relative mx-auto max-w-6xl overflow-hidden rounded-[2.5rem] bg-brand-950 px-6 py-16 sm:px-12">
             <div className="pointer-events-none absolute -end-24 -top-24 h-80 w-80 animate-orb-drift rounded-full bg-gold-400/15 blur-3xl" />
             <div className="pointer-events-none absolute -start-16 bottom-0 h-64 w-64 animate-orb-drift rounded-full bg-brand-400/20 blur-3xl [animation-delay:3s]" />
+            <Reveal>
+              <h2 className="relative mb-12 text-2xl font-black text-white md:text-3xl">
+                {t("landing.statsTitle")}
+              </h2>
+            </Reveal>
             <div className="relative grid gap-10 sm:grid-cols-3">
               {([1, 2, 3] as const).map((i, idx) => (
                 <Reveal key={i} delay={idx * 150}>
@@ -316,7 +321,7 @@ function FeatureCard({
 }) {
   return (
     <div className="card group relative h-full overflow-hidden transition-all duration-300 hover:-translate-y-1.5 hover:shadow-[0_24px_50px_-20px_theme(colors.brand.700/35%)]">
-      <div className="pointer-events-none absolute -end-6 -top-8 text-8xl font-black text-brand-900/[0.04] transition-colors duration-300 group-hover:text-gold-400/15">
+      <div className="pointer-events-none absolute end-5 top-4 text-6xl font-black leading-none text-brand-900/[0.06] transition-colors duration-300 group-hover:text-gold-400/25">
         {String(index + 1).padStart(2, "0")}
       </div>
       <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-500 to-brand-800 text-white shadow-soft transition-transform duration-300 group-hover:rotate-6 group-hover:scale-110">

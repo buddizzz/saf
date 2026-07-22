@@ -23,6 +23,7 @@ export const am: Translations = {
     feature2Body: "ለእያንዳንዱ ሱቅ ሊታተም የሚችል አገናኝ እና የQR ኮድ።",
     feature3Title: "ብልጥ ማስጠንቀቂያዎች",
     feature3Body: "የደንበኛው ተራ ሲቀርብ ድምፅ እና ንዝረት።",
+    featuresKicker: "ለምን SAF?",
     newBadgeTag: "አዲስ",
     newBadgeText: "በአርማዎ እና ቀለሞችዎ ሙሉ የምርት ማንነት",
     statsTitle: "በራሳቸው የሚናገሩ ቁጥሮች",

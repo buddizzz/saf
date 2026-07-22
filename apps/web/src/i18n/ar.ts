@@ -21,6 +21,7 @@ export const ar = {
     feature2Body: "رابط ورمز QR جاهز للطباعة لكل محل.",
     feature3Title: "تنبيهات ذكية",
     feature3Body: "تنبيه صوتي واهتزاز عند اقتراب دور العميل.",
+    featuresKicker: "لماذا صفّ؟",
     newBadgeTag: "جديد",
     newBadgeText: "هوية تجارية كاملة بشعارك وألوانك",
     statsTitle: "أرقام تتحدث عن نفسها",

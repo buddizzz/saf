@@ -23,6 +23,7 @@ export const hi: Translations = {
     feature2Body: "हर दुकान के लिए प्रिंट करने योग्य लिंक और QR कोड।",
     feature3Title: "स्मार्ट अलर्ट",
     feature3Body: "ग्राहक की बारी नज़दीक आने पर ध्वनि और कंपन।",
+    featuresKicker: "SAF ही क्यों?",
     newBadgeTag: "नया",
     newBadgeText: "आपके लोगो और रंगों के साथ पूर्ण ब्रांड पहचान",
     statsTitle: "आंकड़े जो खुद बोलते हैं",
