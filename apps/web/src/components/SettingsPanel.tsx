@@ -37,6 +37,11 @@ function ThemeSection({
   const { t } = useTranslation();
   const [current, setCurrent] = useState(shop.theme_id);
 
+  // مزامنة التحديد مع حالة الخادم عند تغيّر بيانات المحل.
+  useEffect(() => {
+    setCurrent(shop.theme_id);
+  }, [shop.theme_id]);
+
   const pick = async (themeId: string, locked: boolean) => {
     if (locked) return;
     setCurrent(themeId);
