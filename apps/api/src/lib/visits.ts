@@ -95,6 +95,8 @@ export interface AudienceFilters {
   ageCategory?: string | null;
   excludeShopId?: string | null;
   limit?: number;
+  /** فقط لعملاء سابقين: آخر زيارة قبل N يوم */
+  daysSinceLastVisit?: number | null;
 }
 
 /** عملاء سابقون لمحل معيّن (مع موافقة تسويق) — لحملة "عملاء سابقون". */
@@ -118,6 +120,13 @@ export async function listPastCustomers(
   if (filters.ageCategory) {
     clauses.push("c.age_category = ?");
     binds.push(filters.ageCategory);
+  }
+  if (filters.daysSinceLastVisit != null) {
+    const cutoff =
+      Math.floor(Date.now() / 1000) -
+      Number(filters.daysSinceLastVisit) * 86400;
+    clauses.push("v.last_visit_at <= ?");
+    binds.push(cutoff);
   }
 
   binds.push(limit);

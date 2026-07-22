@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import type { AppEnv } from "./lib/http";
+import type { Env } from "./types";
 import { authRoutes } from "./routes/auth";
 import { shopRoutes } from "./routes/shops";
 import { locationRoutes } from "./routes/locations";
@@ -10,6 +11,10 @@ import { assetRoutes } from "./routes/assets";
 import { subscriptionRoutes } from "./routes/subscription";
 import { bookingRoutes } from "./routes/booking";
 import { adminRoutes } from "./routes/admin";
+import { campaignRoutes } from "./routes/campaigns";
+import { billingRoutes } from "./routes/billing";
+import { marketingRoutes } from "./routes/marketing";
+import { runCampaignCron } from "./cron/send-campaigns";
 
 export { ShopQueue } from "./durable-objects/ShopQueue";
 
@@ -35,10 +40,13 @@ app.route("/auth", authRoutes);
 app.route("/staff", staffRoutes);
 app.route("/shops", shopRoutes);
 app.route("/shops", subscriptionRoutes);
+app.route("/shops", campaignRoutes);
+app.route("/shops", billingRoutes);
 app.route("/locations", locationRoutes);
 app.route("/queue", queueRoutes);
 app.route("/assets", assetRoutes);
 app.route("/", bookingRoutes);
+app.route("/", marketingRoutes);
 app.route("/admin", adminRoutes);
 
 app.notFound((c) => c.json({ error: "المسار غير موجود" }, 404));
@@ -47,4 +55,16 @@ app.onError((err, c) => {
   return c.json({ error: "خطأ داخلي في الخادم" }, 500);
 });
 
-export default app;
+const worker = {
+  fetch: app.fetch,
+  async scheduled(
+    _controller: ScheduledController,
+    env: Env,
+    _ctx: ExecutionContext,
+  ) {
+    const result = await runCampaignCron(env);
+    console.log("campaign cron", result);
+  },
+};
+
+export default worker;

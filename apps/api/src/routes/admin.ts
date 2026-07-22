@@ -5,6 +5,8 @@ import { hashPassword, verifyPassword } from "../lib/crypto";
 import { generateId } from "../lib/slug";
 import { issueToken } from "../lib/jwt";
 import { periodEndForPlan } from "../lib/subscription";
+import { creditBalance, ensureShopBalance } from "../lib/billing";
+import { dispatchCampaign } from "../lib/campaigns";
 import {
   requireAdmin,
   requireAdminRoles,
@@ -159,11 +161,25 @@ adminRoutes.get(
        WHERE status = 'confirmed' AND appointment_time >= unixepoch()`,
     ).first();
 
+    const campaigns = await c.env.DB.prepare(
+      `SELECT
+         SUM(CASE WHEN status = 'pending_review' THEN 1 ELSE 0 END) AS campaigns_pending,
+         SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) AS campaigns_completed,
+         SUM(CASE WHEN status = 'sending' OR status = 'scheduled' THEN 1 ELSE 0 END) AS campaigns_active
+       FROM campaigns`,
+    ).first();
+
+    const messages = await c.env.DB.prepare(
+      `SELECT COUNT(*) AS messages_sent FROM campaign_messages WHERE status = 'sent'`,
+    ).first();
+
     return c.json({
       overview: {
         ...totals,
         ...reports,
         ...appointments,
+        ...campaigns,
+        ...messages,
       },
     });
   },
@@ -557,5 +573,211 @@ adminRoutes.delete(
       .run();
     await audit(c.env.DB, admin.sub, "slug.unreserve", "slug", slug);
     return c.json({ ok: true });
+  },
+);
+
+adminRoutes.get(
+  "/campaigns/pending",
+  requireAdmin,
+  requireAdminRoles("super_admin", "ops_admin"),
+  async (c) => {
+    const { results } = await c.env.DB.prepare(
+      `SELECT c.*, s.name AS shop_name, s.slug AS shop_slug
+       FROM campaigns c
+       JOIN shops s ON s.id = c.shop_id
+       WHERE c.status = 'pending_review'
+       ORDER BY c.created_at ASC
+       LIMIT 100`,
+    ).all();
+    return c.json({ campaigns: results ?? [] });
+  },
+);
+
+adminRoutes.post(
+  "/campaigns/:id/approve",
+  requireAdmin,
+  requireAdminRoles("super_admin", "ops_admin"),
+  async (c) => {
+    const admin = c.get("admin");
+    const campaign = await c.env.DB.prepare(
+      `SELECT id, status, scheduled_at FROM campaigns WHERE id = ?`,
+    )
+      .bind(c.req.param("id"))
+      .first<{ id: string; status: string; scheduled_at: number | null }>();
+    if (!campaign) return c.json({ error: "الحملة غير موجودة" }, 404);
+    if (campaign.status !== "pending_review") {
+      return c.json({ error: "الحملة ليست بانتظار المراجعة" }, 400);
+    }
+
+    const now = Math.floor(Date.now() / 1000);
+    await c.env.DB.prepare(
+      `UPDATE campaigns
+       SET status = 'scheduled', moderated_by = ?, moderated_at = ?
+       WHERE id = ?`,
+    )
+      .bind(admin.sub, now, campaign.id)
+      .run();
+
+    await audit(
+      c.env.DB,
+      admin.sub,
+      "campaign.approve",
+      "campaign",
+      campaign.id,
+    );
+
+    // إرسال فوري إن لم تكن مجدولة للمستقبل
+    if (!campaign.scheduled_at || campaign.scheduled_at <= now) {
+      const result = await dispatchCampaign(c.env, campaign.id);
+      return c.json({ ok: true, dispatched: true, ...result });
+    }
+    return c.json({ ok: true, dispatched: false, scheduled_at: campaign.scheduled_at });
+  },
+);
+
+adminRoutes.post(
+  "/campaigns/:id/reject",
+  requireAdmin,
+  requireAdminRoles("super_admin", "ops_admin"),
+  async (c) => {
+    const admin = c.get("admin");
+    const body = await c.req.json().catch(() => ({}));
+    const err = requireFields(body, ["reason"]);
+    if (err) return c.json({ error: err }, 400);
+
+    const campaign = await c.env.DB.prepare(
+      `SELECT id, status, shop_id, cost FROM campaigns WHERE id = ?`,
+    )
+      .bind(c.req.param("id"))
+      .first<{
+        id: string;
+        status: string;
+        shop_id: string;
+        cost: number;
+      }>();
+    if (!campaign) return c.json({ error: "الحملة غير موجودة" }, 404);
+    if (campaign.status !== "pending_review") {
+      return c.json({ error: "الحملة ليست بانتظار المراجعة" }, 400);
+    }
+
+    const now = Math.floor(Date.now() / 1000);
+    await c.env.DB.prepare(
+      `UPDATE campaigns
+       SET status = 'rejected', rejection_reason = ?, moderated_by = ?, moderated_at = ?
+       WHERE id = ?`,
+    )
+      .bind(body.reason, admin.sub, now, campaign.id)
+      .run();
+
+    // استرجاع الرصيد المخصوم
+    if (campaign.cost > 0) {
+      await creditBalance(c.env.DB, campaign.shop_id, campaign.cost, {
+        provider: "manual",
+        note: `refund rejected campaign ${campaign.id}`,
+        applyVolumeBonus: false,
+      });
+    }
+
+    await audit(
+      c.env.DB,
+      admin.sub,
+      "campaign.reject",
+      "campaign",
+      campaign.id,
+      body.reason,
+    );
+
+    return c.json({ ok: true });
+  },
+);
+
+adminRoutes.post(
+  "/shops/:id/balance-adjust",
+  requireAdmin,
+  requireAdminRoles("super_admin"),
+  async (c) => {
+    const admin = c.get("admin");
+    const body = await c.req.json().catch(() => ({}));
+    const err = requireFields(body, ["amount", "reason"]);
+    if (err) return c.json({ error: err }, 400);
+
+    const amount = Number(body.amount);
+    if (!Number.isFinite(amount) || amount === 0) {
+      return c.json({ error: "المبلغ غير صالح" }, 400);
+    }
+
+    const shop = await c.env.DB.prepare("SELECT id FROM shops WHERE id = ?")
+      .bind(c.req.param("id"))
+      .first();
+    if (!shop) return c.json({ error: "المحل غير موجود" }, 404);
+
+    await ensureShopBalance(c.env.DB, c.req.param("id"));
+
+    if (amount > 0) {
+      const result = await creditBalance(c.env.DB, c.req.param("id"), amount, {
+        provider: "manual",
+        note: body.reason,
+        applyVolumeBonus: body.apply_bonus === true,
+      });
+      await audit(
+        c.env.DB,
+        admin.sub,
+        "shop.balance_credit",
+        "shop",
+        c.req.param("id"),
+        `${amount}: ${body.reason}`,
+      );
+      return c.json({ ok: true, ...result });
+    }
+
+    // خصم يدوي
+    const debitAmount = Math.abs(amount);
+    const bal = await ensureShopBalance(c.env.DB, c.req.param("id"));
+    if (bal.balance < debitAmount) {
+      return c.json({ error: "الرصيد أقل من مبلغ الخصم", balance: bal.balance }, 400);
+    }
+    await c.env.DB.prepare(
+      `UPDATE shop_balance SET balance = balance - ?, updated_at = unixepoch()
+       WHERE shop_id = ?`,
+    )
+      .bind(debitAmount, c.req.param("id"))
+      .run();
+    await c.env.DB.prepare(
+      `INSERT INTO payments (id, shop_id, amount, bonus_amount, provider, status, note)
+       VALUES (?, ?, ?, 0, 'manual', 'completed', ?)`,
+    )
+      .bind(
+        generateId("pay"),
+        c.req.param("id"),
+        -debitAmount,
+        body.reason,
+      )
+      .run();
+
+    await audit(
+      c.env.DB,
+      admin.sub,
+      "shop.balance_debit",
+      "shop",
+      c.req.param("id"),
+      `${-debitAmount}: ${body.reason}`,
+    );
+
+    const next = await ensureShopBalance(c.env.DB, c.req.param("id"));
+    return c.json({ ok: true, balance: next.balance });
+  },
+);
+
+adminRoutes.get(
+  "/shops/:id/balance",
+  requireAdmin,
+  requireAdminRoles("super_admin", "ops_admin", "support_agent"),
+  async (c) => {
+    const shop = await c.env.DB.prepare("SELECT id FROM shops WHERE id = ?")
+      .bind(c.req.param("id"))
+      .first();
+    if (!shop) return c.json({ error: "المحل غير موجود" }, 404);
+    const bal = await ensureShopBalance(c.env.DB, c.req.param("id"));
+    return c.json({ balance: bal });
   },
 );

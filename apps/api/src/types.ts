@@ -7,6 +7,11 @@ export interface Env {
   JWT_SECRET: string;
   ENVIRONMENT: string;
   ALLOWED_ORIGINS: string;
+  /** Meta WhatsApp Cloud API — اختياري محليًا (وضع stub) */
+  WHATSAPP_TOKEN?: string;
+  WHATSAPP_PHONE_NUMBER_ID?: string;
+  /** أصل واجهة الويب لروابط إلغاء الاشتراك */
+  PUBLIC_WEB_ORIGIN?: string;
 }
 
 export interface AuthPayload {

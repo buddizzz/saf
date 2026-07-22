@@ -10,6 +10,9 @@ interface Overview {
   shops_free: number;
   open_reports: number;
   upcoming: number;
+  campaigns_pending?: number;
+  campaigns_completed?: number;
+  messages_sent?: number;
 }
 
 interface ShopRow {
@@ -40,7 +43,20 @@ interface AuditEntry {
   created_at: number;
 }
 
-type Tab = "overview" | "shops" | "audit";
+interface PendingCampaign {
+  id: string;
+  name: string;
+  shop_id: string;
+  shop_name: string;
+  shop_slug: string;
+  audience_type: string;
+  audience_count: number;
+  cost: number;
+  message: string;
+  created_at: number;
+}
+
+type Tab = "overview" | "shops" | "campaigns" | "audit";
 
 export function DashboardPage() {
   const { admin, logout } = useAdminAuth();
@@ -49,8 +65,14 @@ export function DashboardPage() {
   const [shops, setShops] = useState<ShopRow[]>([]);
   const [query, setQuery] = useState("");
   const [audit, setAudit] = useState<AuditEntry[]>([]);
+  const [pending, setPending] = useState<PendingCampaign[]>([]);
   const [selected, setSelected] = useState<ShopRow | null>(null);
   const [reason, setReason] = useState("");
+  const [rejectReason, setRejectReason] = useState("");
+  const [rejectId, setRejectId] = useState<string | null>(null);
+  const [creditShop, setCreditShop] = useState<ShopRow | null>(null);
+  const [creditAmount, setCreditAmount] = useState("100");
+  const [creditReason, setCreditReason] = useState("");
   const [message, setMessage] = useState<string | null>(null);
 
   const canWrite = admin?.role === "super_admin" || admin?.role === "ops_admin";
@@ -77,11 +99,20 @@ export function DashboardPage() {
     setAudit(res.entries);
   }, [canWrite]);
 
+  const loadPending = useCallback(async () => {
+    if (!canWrite) return;
+    const res = await adminFetch<{ campaigns: PendingCampaign[] }>(
+      "/admin/campaigns/pending",
+    );
+    setPending(res.campaigns);
+  }, [canWrite]);
+
   useEffect(() => {
     void loadOverview();
     void loadShops();
     void loadAudit();
-  }, [loadOverview, loadShops, loadAudit]);
+    void loadPending();
+  }, [loadOverview, loadShops, loadAudit, loadPending]);
 
   const suspend = async (e: FormEvent) => {
     e.preventDefault();
@@ -121,6 +152,46 @@ export function DashboardPage() {
     await loadAudit();
   };
 
+  const approveCampaign = async (id: string) => {
+    await adminFetch(`/admin/campaigns/${id}/approve`, { method: "POST" });
+    setMessage("تمت الموافقة على الحملة وإرسالها");
+    await loadPending();
+    await loadOverview();
+    await loadAudit();
+  };
+
+  const rejectCampaign = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!rejectId || !rejectReason.trim()) return;
+    await adminFetch(`/admin/campaigns/${rejectId}/reject`, {
+      method: "POST",
+      body: JSON.stringify({ reason: rejectReason }),
+    });
+    setMessage("تم رفض الحملة واسترجاع الرصيد");
+    setRejectId(null);
+    setRejectReason("");
+    await loadPending();
+    await loadOverview();
+    await loadAudit();
+  };
+
+  const adjustBalance = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!creditShop || !creditReason.trim()) return;
+    await adminFetch(`/admin/shops/${creditShop.id}/balance-adjust`, {
+      method: "POST",
+      body: JSON.stringify({
+        amount: Number(creditAmount),
+        reason: creditReason,
+        apply_bonus: true,
+      }),
+    });
+    setMessage(`تم تعديل رصيد «${creditShop.name}»`);
+    setCreditShop(null);
+    setCreditReason("");
+    await loadAudit();
+  };
+
   return (
     <div className="mx-auto min-h-screen max-w-6xl px-4 py-6">
       <header className="mb-6 flex flex-wrap items-center justify-between gap-3">
@@ -136,11 +207,12 @@ export function DashboardPage() {
         </button>
       </header>
 
-      <nav className="mb-5 flex gap-2">
+      <nav className="mb-5 flex flex-wrap gap-2">
         {(
           [
             ["overview", "نظرة عامة"],
             ["shops", "المحلات"],
+            ...(canWrite ? [["campaigns", "مراجعة الحملات"] as const] : []),
             ...(canWrite ? [["audit", "سجل التدقيق"] as const] : []),
           ] as Array<[Tab, string]>
         ).map(([id, label]) => (
@@ -170,6 +242,9 @@ export function DashboardPage() {
             ["مجانية", overview.shops_free],
             ["بلاغات مفتوحة", overview.open_reports],
             ["مواعيد قادمة", overview.upcoming],
+            ["حملات بانتظار المراجعة", overview.campaigns_pending ?? 0],
+            ["حملات مكتملة", overview.campaigns_completed ?? 0],
+            ["رسائل مُرسلة", overview.messages_sent ?? 0],
           ].map(([label, value]) => (
             <div key={String(label)} className="panel">
               <div className="text-xs font-semibold text-ink-700/60">{label}</div>
@@ -262,6 +337,14 @@ export function DashboardPage() {
                             تفعيل
                           </button>
                         )}
+                        {isSuper && (
+                          <button
+                            className="btn-ghost !px-2 !py-1 text-xs"
+                            onClick={() => setCreditShop(shop)}
+                          >
+                            رصيد
+                          </button>
+                        )}
                         {isSuper && shop.subscription_tier !== "pro" && (
                           <button
                             className="btn-ghost !px-2 !py-1 text-xs"
@@ -304,6 +387,110 @@ export function DashboardPage() {
                   type="button"
                   className="btn-ghost"
                   onClick={() => setSelected(null)}
+                >
+                  إلغاء
+                </button>
+              </div>
+            </form>
+          )}
+
+          {creditShop && (
+            <form onSubmit={adjustBalance} className="panel max-w-lg space-y-3">
+              <h3 className="font-bold">تعديل رصيد «{creditShop.name}»</h3>
+              <p className="text-xs text-ink-700/60">
+                بوابة الدفع مؤجّلة — الشحن اليدوي من هنا لتشغيل الحملات.
+              </p>
+              <div>
+                <label className="label">المبلغ (موجب للشحن / سالب للخصم)</label>
+                <input
+                  className="field"
+                  type="number"
+                  step="0.01"
+                  value={creditAmount}
+                  onChange={(e) => setCreditAmount(e.target.value)}
+                  required
+                />
+              </div>
+              <div>
+                <label className="label">السبب (إلزامي)</label>
+                <input
+                  className="field"
+                  value={creditReason}
+                  onChange={(e) => setCreditReason(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="flex gap-2">
+                <button className="btn-primary">حفظ</button>
+                <button
+                  type="button"
+                  className="btn-ghost"
+                  onClick={() => setCreditShop(null)}
+                >
+                  إلغاء
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
+      )}
+
+      {tab === "campaigns" && (
+        <div className="space-y-4">
+          <p className="text-sm text-ink-700/70">
+            حملات «عملاء جدد» الكبيرة أو التي تحتوي كلمات محظورة تنتظر موافقة يدوية.
+          </p>
+          {pending.length === 0 ? (
+            <div className="panel text-sm text-ink-700/60">لا توجد حملات بانتظار المراجعة</div>
+          ) : (
+            pending.map((c) => (
+              <div key={c.id} className="panel space-y-3">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div>
+                    <div className="font-bold">{c.name}</div>
+                    <div className="text-xs text-ink-700/60">
+                      {c.shop_name} · /{c.shop_slug} · {c.audience_type} ·{" "}
+                      {c.audience_count} مستهدف · {c.cost} SAR
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      className="btn-primary !px-3 !py-1 text-xs"
+                      onClick={() => void approveCampaign(c.id)}
+                    >
+                      موافقة وإرسال
+                    </button>
+                    <button
+                      className="btn-danger !px-3 !py-1 text-xs"
+                      onClick={() => setRejectId(c.id)}
+                    >
+                      رفض
+                    </button>
+                  </div>
+                </div>
+                <pre className="whitespace-pre-wrap rounded-lg bg-ink-50 p-3 text-sm">
+                  {c.message}
+                </pre>
+              </div>
+            ))
+          )}
+
+          {rejectId && (
+            <form onSubmit={rejectCampaign} className="panel max-w-lg space-y-3">
+              <h3 className="font-bold">رفض الحملة</h3>
+              <textarea
+                className="field min-h-[80px]"
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+                placeholder="سبب الرفض (يصل للمالك)"
+                required
+              />
+              <div className="flex gap-2">
+                <button className="btn-danger">تأكيد الرفض</button>
+                <button
+                  type="button"
+                  className="btn-ghost"
+                  onClick={() => setRejectId(null)}
                 >
                   إلغاء
                 </button>
