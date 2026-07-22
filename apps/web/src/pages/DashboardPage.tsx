@@ -6,6 +6,7 @@ import { useAuth } from "../lib/auth";
 import { useQueueWebSocket } from "../hooks/useQueueWebSocket";
 import { Logo } from "../components/Logo";
 import { LanguageSwitcher } from "../components/LanguageSwitcher";
+import { SettingsPanel } from "../components/SettingsPanel";
 import type { Shop } from "../lib/types";
 
 export function DashboardPage() {
@@ -89,6 +90,7 @@ function ShopManager({ shop, onChange }: { shop: Shop; onChange: () => void }) {
   const { t } = useTranslation();
   const { snapshot } = useQueueWebSocket(shop.id);
   const [accepting, setAccepting] = useState(shop.is_accepting_queue === 1);
+  const [showSettings, setShowSettings] = useState(false);
   const customerUrl = `${location.origin}/q/${shop.slug}`;
   const [copied, setCopied] = useState(false);
 
@@ -125,18 +127,28 @@ function ShopManager({ shop, onChange }: { shop: Shop; onChange: () => void }) {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-extrabold text-brand-800">{shop.name}</h1>
-        <button
-          className={accepting ? "btn-ghost" : "btn-gold"}
-          onClick={toggleAccepting}
-        >
-          <span
-            className={`h-2.5 w-2.5 rounded-full ${
-              accepting ? "bg-emerald-500" : "bg-rose-500"
-            }`}
-          />
-          {accepting ? t("dashboard.pauseQueue") : t("dashboard.resumeQueue")}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            className="btn-ghost"
+            onClick={() => setShowSettings((v) => !v)}
+          >
+            {showSettings ? t("settings.close") : t("settings.open")}
+          </button>
+          <button
+            className={accepting ? "btn-ghost" : "btn-gold"}
+            onClick={toggleAccepting}
+          >
+            <span
+              className={`h-2.5 w-2.5 rounded-full ${
+                accepting ? "bg-emerald-500" : "bg-rose-500"
+              }`}
+            />
+            {accepting ? t("dashboard.pauseQueue") : t("dashboard.resumeQueue")}
+          </button>
+        </div>
       </div>
+
+      {showSettings && <SettingsPanel shop={shop} onChange={onChange} />}
 
       <div className="grid gap-6 md:grid-cols-[1fr_280px]">
         <div className="space-y-6">

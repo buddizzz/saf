@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import type { AppEnv } from "../lib/http";
 import { requireFields } from "../lib/http";
 import { generateId, generateSlug } from "../lib/slug";
+import { hashPassword } from "../lib/crypto";
 import { isWithinWorkingHours } from "../lib/hours";
 import { requireAuth } from "../middleware/auth";
 
@@ -146,4 +147,72 @@ shopRoutes.patch("/:id", requireAuth, async (c) => {
     .bind(id)
     .first();
   return c.json({ shop: updated });
+});
+
+async function ownsShop(
+  c: { env: AppEnv["Bindings"] },
+  ownerId: string,
+  shopId: string,
+): Promise<boolean> {
+  const shop = await c.env.DB.prepare(
+    "SELECT id FROM shops WHERE id = ? AND owner_id = ?",
+  )
+    .bind(shopId, ownerId)
+    .first();
+  return !!shop;
+}
+
+// قائمة موظفي المحل (المالك فقط).
+shopRoutes.get("/:id/staff", requireAuth, async (c) => {
+  const auth = c.get("auth");
+  const shopId = c.req.param("id");
+  if (!(await ownsShop(c, auth.sub, shopId))) {
+    return c.json({ error: "غير مصرّح" }, 403);
+  }
+  const { results } = await c.env.DB.prepare(
+    "SELECT id, name, role, is_active, created_at FROM staff WHERE shop_id = ? ORDER BY created_at",
+  )
+    .bind(shopId)
+    .all();
+  return c.json({ staff: results ?? [] });
+});
+
+// إضافة موظف برمز PIN (المالك فقط).
+shopRoutes.post("/:id/staff", requireAuth, async (c) => {
+  const auth = c.get("auth");
+  const shopId = c.req.param("id");
+  if (!(await ownsShop(c, auth.sub, shopId))) {
+    return c.json({ error: "غير مصرّح" }, 403);
+  }
+  const body = await c.req.json().catch(() => ({}));
+  const err = requireFields(body, ["name", "pin"]);
+  if (err) return c.json({ error: err }, 400);
+  if (!/^\d{4,6}$/.test(String(body.pin))) {
+    return c.json({ error: "رمز PIN يجب أن يكون 4 إلى 6 أرقام" }, 400);
+  }
+
+  const id = generateId("staff");
+  const pinHash = await hashPassword(String(body.pin));
+  await c.env.DB.prepare(
+    "INSERT INTO staff (id, shop_id, name, pin_code_hash, role) VALUES (?, ?, ?, ?, 'staff')",
+  )
+    .bind(id, shopId, body.name, pinHash)
+    .run();
+
+  return c.json({ staff: { id, name: body.name, role: "staff" } }, 201);
+});
+
+// تعطيل موظف (المالك فقط).
+shopRoutes.delete("/:id/staff/:staffId", requireAuth, async (c) => {
+  const auth = c.get("auth");
+  const shopId = c.req.param("id");
+  if (!(await ownsShop(c, auth.sub, shopId))) {
+    return c.json({ error: "غير مصرّح" }, 403);
+  }
+  await c.env.DB.prepare(
+    "DELETE FROM staff WHERE id = ? AND shop_id = ?",
+  )
+    .bind(c.req.param("staffId"), shopId)
+    .run();
+  return c.json({ ok: true });
 });

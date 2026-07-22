@@ -29,8 +29,22 @@ export interface Shop {
   subscription_tier: string;
   avg_service_seconds: number;
   theme_id: string;
+  theme_custom: string | null;
+  working_hours: string | null;
   logo_url: string | null;
 }
+
+export interface StaffMember {
+  id: string;
+  name: string;
+  role: string;
+  is_active: number;
+}
+
+export type WorkingHours = Record<
+  string,
+  { open: string; close: string } | null
+>;
 
 export interface PublicShop {
   id: string;
@@ -38,6 +52,7 @@ export interface PublicShop {
   slug: string;
   shop_type: string;
   theme_id: string;
+  theme_custom: string | null;
   logo_url: string | null;
   isOpen: boolean;
   closedReason: string | null;

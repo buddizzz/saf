@@ -20,15 +20,17 @@ function stubFor(c: { env: AppEnv["Bindings"] }, shopId: string) {
   return c.env.SHOP_QUEUE.get(id);
 }
 
-async function assertOwnsShop(
+// يسمح للمالك (الذي يملك المحل) أو الموظف (المقيّد بنطاق المحل) بالتحكم بالطابور.
+async function canControlShop(
   c: { env: AppEnv["Bindings"] },
-  ownerId: string,
+  auth: AppEnv["Variables"]["auth"],
   shopId: string,
 ): Promise<boolean> {
+  if (auth.role === "staff") return auth.shopScope === shopId;
   const shop = await c.env.DB.prepare(
     "SELECT id FROM shops WHERE id = ? AND owner_id = ?",
   )
-    .bind(shopId, ownerId)
+    .bind(shopId, auth.sub)
     .first();
   return !!shop;
 }
@@ -69,6 +71,7 @@ queueRoutes.post("/join", async (c) => {
     gender: body.gender ?? null,
     ageCategory: body.age_category ?? null,
     consent: true,
+    marketingConsent: body.marketing_consent === true,
   });
 
   await stubFor(c, shop.id).broadcast(shop.id);
@@ -125,7 +128,7 @@ queueRoutes.get("/:shopId/ws", async (c) => {
 queueRoutes.get("/:shopId/list", requireAuth, async (c) => {
   const auth = c.get("auth");
   const shopId = c.req.param("shopId");
-  if (!(await assertOwnsShop(c, auth.sub, shopId))) {
+  if (!(await canControlShop(c, auth, shopId))) {
     return c.json({ error: "غير مصرّح لهذا المحل" }, 403);
   }
   const snapshot = await getSnapshot(c.env.DB, shopId);
@@ -136,7 +139,7 @@ queueRoutes.get("/:shopId/list", requireAuth, async (c) => {
 queueRoutes.post("/:shopId/next", requireAuth, async (c) => {
   const auth = c.get("auth");
   const shopId = c.req.param("shopId");
-  if (!(await assertOwnsShop(c, auth.sub, shopId))) {
+  if (!(await canControlShop(c, auth, shopId))) {
     return c.json({ error: "غير مصرّح لهذا المحل" }, 403);
   }
   const number = await callNext(c.env.DB, shopId);
@@ -152,7 +155,7 @@ queueRoutes.post("/:shopId/next", requireAuth, async (c) => {
 queueRoutes.post("/:shopId/skip", requireAuth, async (c) => {
   const auth = c.get("auth");
   const shopId = c.req.param("shopId");
-  if (!(await assertOwnsShop(c, auth.sub, shopId))) {
+  if (!(await canControlShop(c, auth, shopId))) {
     return c.json({ error: "غير مصرّح لهذا المحل" }, 403);
   }
   await skipCurrent(c.env.DB, shopId, "cancelled");
@@ -164,7 +167,7 @@ queueRoutes.post("/:shopId/skip", requireAuth, async (c) => {
 queueRoutes.post("/:shopId/complete", requireAuth, async (c) => {
   const auth = c.get("auth");
   const shopId = c.req.param("shopId");
-  if (!(await assertOwnsShop(c, auth.sub, shopId))) {
+  if (!(await canControlShop(c, auth, shopId))) {
     return c.json({ error: "غير مصرّح لهذا المحل" }, 403);
   }
   await completeCurrent(c.env.DB, shopId);

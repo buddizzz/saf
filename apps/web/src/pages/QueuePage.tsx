@@ -1,17 +1,29 @@
-import { useEffect, useRef, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Link, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { apiFetch } from "../lib/api";
 import { useQueueWebSocket } from "../hooks/useQueueWebSocket";
 import { useAudioAlerts } from "../hooks/useAudioAlerts";
 import { Logo } from "../components/Logo";
 import { LanguageSwitcher } from "../components/LanguageSwitcher";
+import { getTheme, themeVars, type Theme } from "../themes";
 import type { PublicShop } from "../lib/types";
 
 const AGE_CATEGORIES = ["13_17", "18_34", "35_54", "55_plus"];
 
 function sessionKey(slug: string) {
   return `saf.session.${slug}`;
+}
+
+// يدمج القالب المختار مع تخصيص المالك (theme_custom) إن وُجد.
+function resolveTheme(shop: PublicShop): Theme {
+  const base = getTheme(shop.theme_id);
+  if (!shop.theme_custom) return base;
+  try {
+    return { ...base, ...(JSON.parse(shop.theme_custom) as Partial<Theme>) };
+  } catch {
+    return base;
+  }
 }
 
 export function QueuePage() {
@@ -30,7 +42,6 @@ export function QueuePage() {
       .finally(() => setLoading(false));
   }, [slug]);
 
-  // استرجاع الجلسة السابقة من localStorage.
   useEffect(() => {
     const saved = localStorage.getItem(sessionKey(slug));
     if (!saved) return;
@@ -48,52 +59,64 @@ export function QueuePage() {
       .catch(() => localStorage.removeItem(sessionKey(slug)));
   }, [slug]);
 
+  const theme = useMemo(() => (shop ? resolveTheme(shop) : getTheme(null)), [shop]);
+
   const onJoined = (token: string, number: number) => {
     localStorage.setItem(sessionKey(slug), token);
     setSessionToken(token);
     setMyNumber(number);
   };
 
-  if (loading) {
-    return <Centered>{t("common.loading")}</Centered>;
-  }
-  if (notFound || !shop) {
-    return <Centered>404</Centered>;
-  }
+  if (loading) return <Centered>{t("common.loading")}</Centered>;
+  if (notFound || !shop) return <Centered>404</Centered>;
 
   return (
-    <div className="mx-auto flex min-h-screen max-w-md flex-col px-5 py-6">
-      <header className="mb-6 flex items-center justify-between">
-        <Logo size={34} />
-        <LanguageSwitcher />
-      </header>
+    <div
+      className="min-h-screen"
+      style={{ ...themeVars(theme), background: theme.bg }}
+    >
+      <div className="mx-auto flex min-h-screen max-w-md flex-col px-5 py-6">
+        <header className="mb-6 flex items-center justify-between">
+          <Logo size={34} />
+          <LanguageSwitcher />
+        </header>
 
-      <div className="mb-6 text-center">
-        <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-2xl bg-brand-600 text-2xl font-extrabold text-white">
-          {shop.name.charAt(0)}
+        <div className="mb-6 text-center">
+          <div
+            className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-2xl text-2xl font-extrabold text-white"
+            style={{ background: theme.primary }}
+          >
+            {shop.name.charAt(0)}
+          </div>
+          <h1
+            className="text-2xl font-extrabold"
+            style={{ color: theme.primaryDark }}
+          >
+            {shop.name}
+          </h1>
+          <ShopStatusBadge shop={shop} />
         </div>
-        <h1 className="text-2xl font-extrabold text-brand-800">{shop.name}</h1>
-        <ShopStatusBadge shop={shop} />
+
+        {sessionToken && myNumber !== null ? (
+          <QueueStatus
+            shopId={shop.id}
+            myNumber={myNumber}
+            sessionToken={sessionToken}
+            avgServiceSeconds={shop.avg_service_seconds}
+            theme={theme}
+          />
+        ) : shop.isOpen ? (
+          <JoinForm slug={slug} onJoined={onJoined} theme={theme} />
+        ) : (
+          <div className="card text-center">
+            <p className="text-lg font-bold text-rose-500">
+              {shop.closedReason ?? t("queue.shopClosed")}
+            </p>
+          </div>
+        )}
+
+        {shop.subscription_tier === "free" && <AdBanner theme={theme} />}
       </div>
-
-      {sessionToken && myNumber !== null ? (
-        <QueueStatus
-          shopId={shop.id}
-          myNumber={myNumber}
-          sessionToken={sessionToken}
-          avgServiceSeconds={shop.avg_service_seconds}
-        />
-      ) : shop.isOpen ? (
-        <JoinForm slug={slug} onJoined={onJoined} />
-      ) : (
-        <div className="card text-center">
-          <p className="text-lg font-bold text-rose-500">
-            {shop.closedReason ?? t("queue.shopClosed")}
-          </p>
-        </div>
-      )}
-
-      {shop.subscription_tier === "free" && <AdBanner />}
     </div>
   );
 }
@@ -120,9 +143,11 @@ function ShopStatusBadge({ shop }: { shop: PublicShop }) {
 function JoinForm({
   slug,
   onJoined,
+  theme,
 }: {
   slug: string;
   onJoined: (token: string, number: number) => void;
+  theme: Theme;
 }) {
   const { t } = useTranslation();
   const { unlock } = useAudioAlerts();
@@ -132,6 +157,7 @@ function JoinForm({
     gender: "male",
     age_category: "18_34",
     consent: false,
+    marketing_consent: false,
   });
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -143,7 +169,7 @@ function JoinForm({
       setError(t("queue.consent"));
       return;
     }
-    unlock(); // فتح قفل الصوت على iOS عند أول تفاعل
+    unlock();
     setBusy(true);
     try {
       const res = await apiFetch<{ queueNumber: number; sessionToken: string }>(
@@ -160,7 +186,7 @@ function JoinForm({
 
   return (
     <form onSubmit={submit} className="card space-y-4">
-      <h2 className="text-lg font-extrabold text-brand-800">
+      <h2 className="text-lg font-extrabold" style={{ color: theme.primaryDark }}>
         {t("queue.joinTitle")}
       </h2>
       <div>
@@ -200,9 +226,7 @@ function JoinForm({
           <select
             className="field"
             value={form.age_category}
-            onChange={(e) =>
-              setForm({ ...form, age_category: e.target.value })
-            }
+            onChange={(e) => setForm({ ...form, age_category: e.target.value })}
           >
             {AGE_CATEGORIES.map((age) => (
               <option key={age} value={age}>
@@ -219,10 +243,35 @@ function JoinForm({
           checked={form.consent}
           onChange={(e) => setForm({ ...form, consent: e.target.checked })}
         />
-        <span>{t("queue.consent")}</span>
+        <span>
+          {t("queue.consent")}{" "}
+          <Link
+            to="/privacy"
+            target="_blank"
+            className="font-bold underline"
+            style={{ color: theme.primary }}
+          >
+            {t("queue.privacyLink")}
+          </Link>
+        </span>
+      </label>
+      <label className="flex items-start gap-2 text-sm text-slate-600">
+        <input
+          type="checkbox"
+          className="mt-1"
+          checked={form.marketing_consent}
+          onChange={(e) =>
+            setForm({ ...form, marketing_consent: e.target.checked })
+          }
+        />
+        <span>{t("queue.marketingConsent")}</span>
       </label>
       {error && <p className="text-sm font-bold text-rose-600">{error}</p>}
-      <button className="btn-primary w-full" disabled={busy}>
+      <button
+        className="btn w-full text-white"
+        style={{ background: theme.primary }}
+        disabled={busy}
+      >
         {busy ? t("common.loading") : t("queue.join")}
       </button>
     </form>
@@ -234,11 +283,13 @@ function QueueStatus({
   myNumber,
   sessionToken,
   avgServiceSeconds,
+  theme,
 }: {
   shopId: string;
   myNumber: number;
   sessionToken: string;
   avgServiceSeconds: number;
+  theme: Theme;
 }) {
   const { t } = useTranslation();
   const { snapshot, status } = useQueueWebSocket(shopId);
@@ -269,7 +320,7 @@ function QueueStatus({
   }, [snapshot, isMyTurn, ahead, playApproaching, playYourTurn]);
 
   if (served) {
-    return <RatingCard sessionToken={sessionToken} />;
+    return <RatingCard sessionToken={sessionToken} theme={theme} />;
   }
 
   return (
@@ -277,22 +328,27 @@ function QueueStatus({
       <ConnectionIndicator status={status} />
 
       <div
-        className={`card text-center transition ${
-          isMyTurn ? "ring-4 ring-gold-400" : ""
-        }`}
+        className="card text-center transition"
+        style={isMyTurn ? { boxShadow: `0 0 0 4px ${theme.accent}` } : undefined}
       >
         <div className="text-sm font-bold text-slate-500">
           {t("queue.yourNumber")}
         </div>
-        <div className="my-2 text-7xl font-extrabold text-brand-700">
+        <div
+          className="my-2 text-7xl font-extrabold"
+          style={{ color: theme.primary }}
+        >
           {myNumber}
         </div>
         {isMyTurn ? (
-          <div className="rounded-xl bg-gold-100 py-3 text-xl font-extrabold text-gold-700">
+          <div
+            className="rounded-xl py-3 text-xl font-extrabold"
+            style={{ background: theme.accent, color: theme.primaryDark }}
+          >
             {t("queue.yourTurn")}
           </div>
         ) : (
-          <div className="text-brand-700">
+          <div style={{ color: theme.primaryDark }}>
             <span className="text-lg font-bold">
               {t("queue.peopleAhead")}: {ahead} {t("queue.person")}
             </span>
@@ -306,7 +362,10 @@ function QueueStatus({
             <div className="text-xs font-bold text-slate-500">
               {t("dashboard.currentServing")}
             </div>
-            <div className="mt-1 text-3xl font-extrabold text-gold-500">
+            <div
+              className="mt-1 text-3xl font-extrabold"
+              style={{ color: theme.accent }}
+            >
               {snapshot?.currentServing ?? "—"}
             </div>
           </div>
@@ -314,7 +373,10 @@ function QueueStatus({
             <div className="text-xs font-bold text-slate-500">
               {t("queue.estimatedWait")}
             </div>
-            <div className="mt-1 text-3xl font-extrabold text-brand-700">
+            <div
+              className="mt-1 text-3xl font-extrabold"
+              style={{ color: theme.primary }}
+            >
               ~{etaMinutes}
             </div>
             <div className="text-xs text-slate-400">{t("queue.minutes")}</div>
@@ -335,7 +397,13 @@ function ConnectionIndicator({ status }: { status: string }) {
   );
 }
 
-function RatingCard({ sessionToken }: { sessionToken: string }) {
+function RatingCard({
+  sessionToken,
+  theme,
+}: {
+  sessionToken: string;
+  theme: Theme;
+}) {
   const { t } = useTranslation();
   const [rating, setRating] = useState(0);
   const [done, setDone] = useState(false);
@@ -355,25 +423,30 @@ function RatingCard({ sessionToken }: { sessionToken: string }) {
         {t("queue.served")}
       </p>
       {done ? (
-        <p className="text-brand-700">{t("queue.thanksRating")}</p>
+        <p style={{ color: theme.primaryDark }}>{t("queue.thanksRating")}</p>
       ) : (
         <>
-          <p className="mb-3 font-bold text-brand-800">{t("queue.rateTitle")}</p>
+          <p className="mb-3 font-bold" style={{ color: theme.primaryDark }}>
+            {t("queue.rateTitle")}
+          </p>
           <div className="mb-4 flex justify-center gap-2">
             {[1, 2, 3, 4, 5].map((star) => (
               <button
                 key={star}
                 type="button"
                 onClick={() => setRating(star)}
-                className={`text-4xl transition ${
-                  star <= rating ? "text-gold-400" : "text-slate-200"
-                }`}
+                className="text-4xl transition"
+                style={{ color: star <= rating ? theme.accent : "#e2e8f0" }}
               >
                 ★
               </button>
             ))}
           </div>
-          <button className="btn-primary w-full" onClick={submit}>
+          <button
+            className="btn w-full text-white"
+            style={{ background: theme.primary }}
+            onClick={submit}
+          >
             {t("queue.submitRating")}
           </button>
         </>
@@ -382,11 +455,14 @@ function RatingCard({ sessionToken }: { sessionToken: string }) {
   );
 }
 
-function AdBanner() {
+function AdBanner({ theme }: { theme: Theme }) {
   return (
     <a
       href="#"
-      className="mt-auto block rounded-xl bg-gradient-to-l from-brand-700 to-brand-500 px-4 py-3 text-center text-sm font-bold text-white"
+      className="mt-auto block rounded-xl px-4 py-3 text-center text-sm font-bold text-white"
+      style={{
+        background: `linear-gradient(to left, ${theme.primaryDark}, ${theme.primary})`,
+      }}
     >
       رقِّ محلك لباقة Pro — بدون إعلانات + حجز عن بُعد ✨
     </a>

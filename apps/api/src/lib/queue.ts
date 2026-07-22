@@ -63,6 +63,7 @@ export interface JoinInput {
   gender?: "male" | "female" | null;
   ageCategory?: string | null;
   consent: boolean;
+  marketingConsent?: boolean;
 }
 
 export async function joinQueue(
@@ -73,18 +74,26 @@ export async function joinQueue(
   const queueDate = todayInRiyadh();
   const now = Math.floor(Date.now() / 1000);
 
-  // upsert للعميل الموحّد
+  // upsert للعميل الموحّد. موافقة التسويق ترتفع فقط (opt-in) ولا تُخفَّض تلقائيًا.
   await db
     .prepare(
-      `INSERT INTO customers (phone, name, gender, age_category, last_visit_at)
-       VALUES (?, ?, ?, ?, ?)
+      `INSERT INTO customers (phone, name, gender, age_category, marketing_consent, last_visit_at)
+       VALUES (?, ?, ?, ?, ?, ?)
        ON CONFLICT(phone) DO UPDATE SET
          name = excluded.name,
          gender = excluded.gender,
          age_category = excluded.age_category,
+         marketing_consent = CASE WHEN excluded.marketing_consent = 1 THEN 1 ELSE customers.marketing_consent END,
          last_visit_at = excluded.last_visit_at`,
     )
-    .bind(input.phone, input.name, input.gender ?? null, input.ageCategory ?? null, now)
+    .bind(
+      input.phone,
+      input.name,
+      input.gender ?? null,
+      input.ageCategory ?? null,
+      input.marketingConsent ? 1 : 0,
+      now,
+    )
     .run();
 
   const maxRow = await db
