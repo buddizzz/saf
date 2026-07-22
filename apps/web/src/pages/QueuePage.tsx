@@ -6,24 +6,14 @@ import { useQueueWebSocket } from "../hooks/useQueueWebSocket";
 import { useAudioAlerts } from "../hooks/useAudioAlerts";
 import { Logo } from "../components/Logo";
 import { LanguageSwitcher } from "../components/LanguageSwitcher";
-import { getTheme, themeVars, type Theme } from "../themes";
+import { getTheme, resolveShopTheme, themeVars, type Theme } from "../themes";
+import { assetUrl } from "../lib/api";
 import type { PublicShop } from "../lib/types";
 
 const AGE_CATEGORIES = ["13_17", "18_34", "35_54", "55_plus"];
 
 function sessionKey(slug: string) {
   return `saf.session.${slug}`;
-}
-
-// يدمج القالب المختار مع تخصيص المالك (theme_custom) إن وُجد.
-function resolveTheme(shop: PublicShop): Theme {
-  const base = getTheme(shop.theme_id);
-  if (!shop.theme_custom) return base;
-  try {
-    return { ...base, ...(JSON.parse(shop.theme_custom) as Partial<Theme>) };
-  } catch {
-    return base;
-  }
 }
 
 export function QueuePage() {
@@ -59,7 +49,10 @@ export function QueuePage() {
       .catch(() => localStorage.removeItem(sessionKey(slug)));
   }, [slug]);
 
-  const theme = useMemo(() => (shop ? resolveTheme(shop) : getTheme(null)), [shop]);
+  const theme = useMemo(
+    () => (shop ? resolveShopTheme(shop) : getTheme(null)),
+    [shop],
+  );
 
   const onJoined = (token: string, number: number) => {
     localStorage.setItem(sessionKey(slug), token);
@@ -77,23 +70,26 @@ export function QueuePage() {
     >
       <div className="mx-auto flex min-h-screen max-w-md flex-col px-5 py-6">
         <header className="mb-6 flex items-center justify-between">
-          <Logo size={34} />
+          <Logo size={26} showWordmark={false} className="opacity-60" />
           <LanguageSwitcher />
         </header>
 
-        <div className="mb-6 text-center">
-          <div
-            className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-2xl text-2xl font-extrabold text-white"
-            style={{ background: theme.primary }}
-          >
-            {shop.name.charAt(0)}
-          </div>
+        <div className="mb-6 animate-fade-in text-center">
+          <BrandMark shop={shop} theme={theme} />
           <h1
-            className="text-2xl font-extrabold"
+            className="text-2xl font-extrabold tracking-tight"
             style={{ color: theme.primaryDark }}
           >
             {shop.name}
           </h1>
+          {shop.tagline && (
+            <p
+              className="mx-auto mt-1 max-w-xs text-sm font-medium opacity-80"
+              style={{ color: theme.primaryDark }}
+            >
+              {shop.tagline}
+            </p>
+          )}
           <ShopStatusBadge shop={shop} />
         </div>
 
@@ -121,6 +117,23 @@ export function QueuePage() {
   );
 }
 
+// شعار المحل الفعلي إن وُجد، وإلا حرف الاسم الأول بلون الهوية التجارية.
+function BrandMark({ shop, theme }: { shop: PublicShop; theme: Theme }) {
+  const logo = assetUrl(shop.logo_url);
+  return (
+    <div
+      className="mx-auto mb-3 flex h-16 w-16 items-center justify-center overflow-hidden rounded-2xl text-2xl font-extrabold text-white shadow-soft"
+      style={{ background: `linear-gradient(135deg, ${theme.primary}, ${theme.primaryDark})` }}
+    >
+      {logo ? (
+        <img src={logo} alt={shop.name} className="h-full w-full object-cover" />
+      ) : (
+        shop.name.charAt(0)
+      )}
+    </div>
+  );
+}
+
 function ShopStatusBadge({ shop }: { shop: PublicShop }) {
   return (
     <span
@@ -132,7 +145,7 @@ function ShopStatusBadge({ shop }: { shop: PublicShop }) {
     >
       <span
         className={`h-2 w-2 rounded-full ${
-          shop.isOpen ? "bg-emerald-500" : "bg-rose-500"
+          shop.isOpen ? "bg-emerald-500 animate-pulse" : "bg-rose-500"
         }`}
       />
       {shop.isOpen ? "🟢" : "🔴"}
@@ -328,21 +341,29 @@ function QueueStatus({
       <ConnectionIndicator status={status} />
 
       <div
-        className="card text-center transition"
-        style={isMyTurn ? { boxShadow: `0 0 0 4px ${theme.accent}` } : undefined}
+        className={`card animate-scale-in text-center transition-shadow duration-500 ${
+          isMyTurn ? "ring-4" : ""
+        }`}
+        style={
+          isMyTurn
+            ? { boxShadow: `0 0 0 4px ${theme.accent}`, borderColor: theme.accent }
+            : undefined
+        }
       >
         <div className="text-sm font-bold text-slate-500">
           {t("queue.yourNumber")}
         </div>
         <div
-          className="my-2 text-7xl font-extrabold"
-          style={{ color: theme.primary }}
+          className="my-2 bg-clip-text text-7xl font-extrabold text-transparent"
+          style={{
+            backgroundImage: `linear-gradient(135deg, ${theme.primary}, ${theme.primaryDark})`,
+          }}
         >
           {myNumber}
         </div>
         {isMyTurn ? (
           <div
-            className="rounded-xl py-3 text-xl font-extrabold"
+            className="animate-pulse rounded-xl py-3 text-xl font-extrabold"
             style={{ background: theme.accent, color: theme.primaryDark }}
           >
             {t("queue.yourTurn")}

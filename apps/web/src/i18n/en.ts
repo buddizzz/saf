@@ -21,6 +21,9 @@ export const en: Translations = {
     feature2Body: "A printable link and QR code for each shop.",
     feature3Title: "Smart alerts",
     feature3Body: "Sound and vibration when the customer's turn approaches.",
+    brandCtaTitle: "A brand identity that reflects your shop",
+    brandCtaBody:
+      "Your logo, colors, and tagline — all shown to customers on your shop's queue page.",
   },
   auth: {
     registerTitle: "Create an owner account",
@@ -33,6 +36,8 @@ export const en: Translations = {
     submitLogin: "Log in",
     haveAccount: "Have an account? Log in",
     noAccount: "No account? Sign up",
+    brandPitch:
+      "Organize your shop's queue and give it a brand identity of its own, with your logo and colors.",
   },
   dashboard: {
     title: "Dashboard",
@@ -115,6 +120,25 @@ export const en: Translations = {
     remove: "Remove",
     staffLoginLink: "Staff login link",
     saved: "Saved",
+    brand: {
+      title: "Brand identity",
+      badge: "Featured",
+      subtitle:
+        "Make the customer page reflect your brand: your logo, colors, and tagline.",
+      logo: "Logo",
+      uploadLogo: "Upload logo",
+      changeLogo: "Change logo",
+      logoHint: "PNG, JPG, WEBP or SVG, up to 2MB.",
+      colors: "Custom colors",
+      primaryColor: "Primary color",
+      accentColor: "Accent color",
+      resetColors: "Reset to theme colors",
+      invalidColor: "Please enter valid colors (e.g. #1f6675)",
+      tagline: "Tagline",
+      taglinePlaceholder: "e.g. A premium grooming experience awaits",
+      preview: "Customer page preview",
+      previewCta: "Join the queue",
+    },
     days: {
       sun: "Sunday",
       mon: "Monday",

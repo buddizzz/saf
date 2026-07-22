@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { apiFetch } from "../lib/api";
 import { THEMES } from "../themes";
+import { BrandIdentitySection } from "./BrandIdentitySection";
 import type { Shop, StaffMember, WorkingHours } from "../lib/types";
 
 const DAYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const;
@@ -18,6 +19,7 @@ export function SettingsPanel({
 
   return (
     <div className="space-y-6">
+      <BrandIdentitySection shop={shop} onChange={onChange} />
       <ThemeSection shop={shop} isPro={isPro} onChange={onChange} />
       <WorkingHoursSection shop={shop} onChange={onChange} />
       <StaffSection shop={shop} />

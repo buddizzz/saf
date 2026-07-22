@@ -7,6 +7,7 @@ import { useQueueWebSocket } from "../hooks/useQueueWebSocket";
 import { Logo } from "../components/Logo";
 import { LanguageSwitcher } from "../components/LanguageSwitcher";
 import { SettingsPanel } from "../components/SettingsPanel";
+import { ShopAvatar } from "../components/ShopAvatar";
 import type { Shop } from "../lib/types";
 
 export function DashboardPage() {
@@ -34,7 +35,7 @@ export function DashboardPage() {
 
   return (
     <div className="min-h-screen">
-      <header className="border-b border-slate-100 bg-white">
+      <header className="sticky top-0 z-10 border-b border-slate-100 bg-white/90 backdrop-blur-sm">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <Logo />
           <div className="flex items-center gap-3">
@@ -51,9 +52,26 @@ export function DashboardPage() {
 
       <main className="mx-auto max-w-6xl px-6 py-8">
         {loading ? (
-          <p className="text-brand-600">{t("common.loading")}</p>
+          <div className="flex items-center gap-2 text-brand-600">
+            <span className="h-4 w-4 animate-spin rounded-full border-2 border-brand-300 border-t-brand-600" />
+            {t("common.loading")}
+          </div>
         ) : shops.length === 0 ? (
-          <CreateShopForm onCreated={loadShops} />
+          <div className="mx-auto max-w-lg">
+            <div className="mb-6 text-center">
+              <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-600 to-brand-800 text-white shadow-soft">
+                <svg width={26} height={26} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                  <path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2" strokeLinecap="round" />
+                  <circle cx="9" cy="7" r="4" />
+                  <path d="M17 3.13a4 4 0 0 1 0 7.75M21 21v-2a4 4 0 0 0-3-3.85" strokeLinecap="round" />
+                </svg>
+              </div>
+              <h2 className="text-xl font-extrabold text-brand-800">
+                {t("dashboard.noShops")}
+              </h2>
+            </div>
+            <CreateShopForm onCreated={loadShops} />
+          </div>
         ) : (
           <div className="grid gap-6 lg:grid-cols-[220px_1fr]">
             <aside className="space-y-2">
@@ -61,13 +79,14 @@ export function DashboardPage() {
                 <button
                   key={shop.id}
                   onClick={() => setSelectedId(shop.id)}
-                  className={`w-full rounded-xl px-4 py-3 text-right font-bold transition ${
+                  className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-right font-bold transition ${
                     shop.id === selectedId
-                      ? "bg-brand-600 text-white"
+                      ? "bg-brand-600 text-white shadow-soft"
                       : "bg-white text-brand-700 hover:bg-brand-50"
                   }`}
                 >
-                  {shop.name}
+                  <ShopAvatar shop={shop} size={32} />
+                  <span className="truncate">{shop.name}</span>
                 </button>
               ))}
               <CreateShopInline onCreated={loadShops} />
@@ -126,7 +145,15 @@ function ShopManager({ shop, onChange }: { shop: Shop; onChange: () => void }) {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-extrabold text-brand-800">{shop.name}</h1>
+        <div className="flex items-center gap-3">
+          <ShopAvatar shop={shop} size={44} />
+          <div>
+            <h1 className="text-2xl font-extrabold text-brand-800">{shop.name}</h1>
+            {shop.tagline && (
+              <p className="text-sm text-slate-500">{shop.tagline}</p>
+            )}
+          </div>
+        </div>
         <div className="flex items-center gap-2">
           <button
             className="btn-ghost"
@@ -153,19 +180,19 @@ function ShopManager({ shop, onChange }: { shop: Shop; onChange: () => void }) {
       <div className="grid gap-6 md:grid-cols-[1fr_280px]">
         <div className="space-y-6">
           <div className="grid grid-cols-2 gap-4">
-            <div className="card text-center">
+            <div className="card overflow-hidden text-center">
               <div className="text-sm font-bold text-slate-500">
                 {t("dashboard.currentServing")}
               </div>
-              <div className="mt-1 text-5xl font-extrabold text-brand-700">
+              <div className="mt-1 bg-gradient-to-br from-brand-600 to-brand-800 bg-clip-text text-5xl font-extrabold text-transparent">
                 {snapshot?.currentServing ?? "—"}
               </div>
             </div>
-            <div className="card text-center">
+            <div className="card overflow-hidden text-center">
               <div className="text-sm font-bold text-slate-500">
                 {t("dashboard.waiting")}
               </div>
-              <div className="mt-1 text-5xl font-extrabold text-gold-500">
+              <div className="mt-1 bg-gradient-to-br from-gold-400 to-gold-600 bg-clip-text text-5xl font-extrabold text-transparent">
                 {waiting.length}
               </div>
               <div className="text-xs text-slate-400">
@@ -191,15 +218,20 @@ function ShopManager({ shop, onChange }: { shop: Shop; onChange: () => void }) {
               {t("dashboard.queueList")}
             </h3>
             {!snapshot || snapshot.entries.length === 0 ? (
-              <p className="py-6 text-center text-slate-400">
+              <div className="py-8 text-center text-slate-400">
+                <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-slate-50">
+                  <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                    <path d="M4 6h16M4 12h16M4 18h7" strokeLinecap="round" />
+                  </svg>
+                </div>
                 {t("dashboard.empty")}
-              </p>
+              </div>
             ) : (
               <ul className="divide-y divide-slate-100">
                 {snapshot.entries.map((e) => (
                   <li
                     key={e.queueNumber}
-                    className="flex items-center justify-between py-3"
+                    className="flex items-center justify-between rounded-lg px-1 py-3 transition hover:bg-slate-50"
                   >
                     <div className="flex items-center gap-3">
                       <span

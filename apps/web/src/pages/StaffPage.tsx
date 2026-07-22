@@ -5,12 +5,17 @@ import { apiFetch } from "../lib/api";
 import { useQueueWebSocket } from "../hooks/useQueueWebSocket";
 import { Logo } from "../components/Logo";
 import { LanguageSwitcher } from "../components/LanguageSwitcher";
+import { ShopAvatar } from "../components/ShopAvatar";
 
 interface StaffSession {
   token: string;
   shopId: string;
   shopName: string;
   staffName: string;
+  theme_id: string;
+  theme_custom: string | null;
+  logo_url: string | null;
+  tagline: string | null;
 }
 
 function staffKey(slug: string) {
@@ -61,7 +66,14 @@ function StaffLogin({
       const res = await apiFetch<{
         token: string;
         staff: { name: string };
-        shop: { id: string; name: string };
+        shop: {
+          id: string;
+          name: string;
+          theme_id: string;
+          theme_custom: string | null;
+          logo_url: string | null;
+          tagline: string | null;
+        };
       }>("/staff/login", {
         method: "POST",
         body: JSON.stringify({ slug, pin }),
@@ -71,6 +83,10 @@ function StaffLogin({
         shopId: res.shop.id,
         shopName: res.shop.name,
         staffName: res.staff.name,
+        theme_id: res.shop.theme_id,
+        theme_custom: res.shop.theme_custom,
+        logo_url: res.shop.logo_url,
+        tagline: res.shop.tagline,
       });
     } catch {
       setError(t("staff.wrongPin"));
@@ -141,10 +157,15 @@ function StaffQueueView({
         </div>
       </header>
 
-      <h1 className="mb-1 text-xl font-extrabold text-brand-800">
-        {session.shopName}
-      </h1>
-      <p className="mb-6 text-sm text-slate-500">{session.staffName}</p>
+      <div className="mb-6 flex items-center gap-3">
+        <ShopAvatar shop={{ ...session, name: session.shopName }} size={44} />
+        <div>
+          <h1 className="text-xl font-extrabold text-brand-800">
+            {session.shopName}
+          </h1>
+          <p className="text-sm text-slate-500">{session.staffName}</p>
+        </div>
+      </div>
 
       <div className="mb-6 grid grid-cols-2 gap-4">
         <div className="card text-center">

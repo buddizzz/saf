@@ -19,6 +19,9 @@ export const ar = {
     feature2Body: "رابط ورمز QR جاهز للطباعة لكل محل.",
     feature3Title: "تنبيهات ذكية",
     feature3Body: "تنبيه صوتي واهتزاز عند اقتراب دور العميل.",
+    brandCtaTitle: "هوية تجارية تعكس محلك",
+    brandCtaBody:
+      "شعارك، ألوانك، وشعارك النصي — كل هذا يظهر لعملائك في صفحة الطابور الخاصة بمحلك.",
   },
   auth: {
     registerTitle: "إنشاء حساب صاحب محل",
@@ -31,6 +34,8 @@ export const ar = {
     submitLogin: "دخول",
     haveAccount: "لديك حساب؟ سجّل الدخول",
     noAccount: "ليس لديك حساب؟ أنشئ حسابًا",
+    brandPitch:
+      "نظّم طابور محلك وامنحه هوية تجارية تعكسه، بشعارك وألوانك الخاصة.",
   },
   dashboard: {
     title: "لوحة التحكم",
@@ -113,6 +118,25 @@ export const ar = {
     remove: "حذف",
     staffLoginLink: "رابط دخول الموظفين",
     saved: "تم الحفظ",
+    brand: {
+      title: "الهوية التجارية",
+      badge: "مميّز",
+      subtitle:
+        "اجعل صفحة العميل تعكس علامتك التجارية: شعارك، ألوانك، وشعارك النصي.",
+      logo: "الشعار",
+      uploadLogo: "رفع شعار",
+      changeLogo: "تغيير الشعار",
+      logoHint: "PNG أو JPG أو WEBP أو SVG، حتى 2 ميغابايت.",
+      colors: "الألوان المخصّصة",
+      primaryColor: "اللون الأساسي",
+      accentColor: "لون التمييز",
+      resetColors: "الرجوع لألوان القالب الافتراضية",
+      invalidColor: "الرجاء إدخال ألوان صحيحة (مثل #1f6675)",
+      tagline: "الشعار النصي (Tagline)",
+      taglinePlaceholder: "مثال: تجربة عناية فاخرة بانتظارك",
+      preview: "معاينة صفحة العميل",
+      previewCta: "انضم إلى الطابور",
+    },
     days: {
       sun: "الأحد",
       mon: "الإثنين",
