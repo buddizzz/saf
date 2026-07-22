@@ -16,6 +16,7 @@ import { billingRoutes } from "./routes/billing";
 import { marketingRoutes } from "./routes/marketing";
 import { whatsappWebhookRoutes } from "./routes/whatsapp-webhook";
 import { runCampaignCron } from "./cron/send-campaigns";
+import { runLifecycleCron } from "./cron/lifecycle";
 
 export { ShopQueue } from "./durable-objects/ShopQueue";
 
@@ -75,6 +76,8 @@ const worker = {
     env: Env,
     _ctx: ExecutionContext,
   ) {
+    const lifecycle = await runLifecycleCron(env);
+    console.log("lifecycle cron", lifecycle);
     const result = await runCampaignCron(env);
     console.log("campaign cron", result);
   },

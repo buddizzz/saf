@@ -292,6 +292,33 @@ export const en: Translations = {
       missyou: "Reminder",
     },
   },
+  automations: {
+    title: "Marketing automation",
+    subtitle:
+      "Inspired by The 1-Page Marketing Plan: turn every visitor into a repeat customer with automatic WhatsApp messages — zero manual work.",
+    proOnly: "Marketing automation is Pro-only — upgrade in the subscription section above.",
+    phaseBefore: "Before the visit: win new customers with WhatsApp campaigns (campaigns section)",
+    phaseDuring: "During the visit: a smooth queue & booking experience that wows",
+    phaseAfter: "After the visit: bring them back and get referrals — automatically",
+    winbackTitle: "Win back absent customers",
+    winbackDesc:
+      "An automatic WhatsApp message to every customer away longer than the set period — they come back without you lifting a finger.",
+    winbackDays: "Days away before messaging",
+    vipTitle: "Reward VIP customers",
+    vipDesc:
+      "A monthly message to your most frequent customers — appreciation that keeps them loyal and raises lifetime value.",
+    vipMinVisits: "Minimum visits",
+    referralTitle: "Ask for referrals",
+    referralDesc:
+      "A weekly message to happy customers (rated 4+ stars) inviting them to bring their friends.",
+    message: "Message text — supports {name} and {shop}",
+    enabled: "On",
+    disabled: "Off",
+    saved: "Saved",
+    quotaHint:
+      "{{used}} of {{quota}} free messages used this month — extra sends are charged to your campaign balance.",
+    runsEvery: "Runs at most once every {{days}} days",
+  },
   unsubscribe: {
     title: "Marketing unsubscribe",
     done: "You are unsubscribed from marketing messages.",

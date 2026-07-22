@@ -292,6 +292,33 @@ export const id: Translations = {
       missyou: "Pengingat",
     },
   },
+  automations: {
+    title: "Pemasaran otomatis",
+    subtitle:
+      "Terinspirasi «The 1-Page Marketing Plan»: ubah setiap pengunjung menjadi pelanggan tetap lewat pesan WhatsApp otomatis — tanpa kerja manual.",
+    proOnly: "Pemasaran otomatis khusus paket Pro — tingkatkan di bagian langganan di atas.",
+    phaseBefore: "Sebelum kunjungan: dapatkan pelanggan baru lewat kampanye WhatsApp (bagian kampanye)",
+    phaseDuring: "Saat kunjungan: pengalaman antrean & booking yang mulus dan mengesankan",
+    phaseAfter: "Setelah kunjungan: buat mereka kembali dan merekomendasikan Anda — otomatis",
+    winbackTitle: "Kembalikan pelanggan yang absen",
+    winbackDesc:
+      "Pesan WhatsApp otomatis untuk setiap pelanggan yang absen melebihi periode yang ditentukan — mereka kembali tanpa usaha Anda.",
+    winbackDays: "Hari absen sebelum pesan dikirim",
+    vipTitle: "Hargai pelanggan VIP",
+    vipDesc:
+      "Pesan bulanan untuk pelanggan paling sering berkunjung — apresiasi yang menjaga loyalitas.",
+    vipMinVisits: "Kunjungan minimum",
+    referralTitle: "Minta rekomendasi",
+    referralDesc:
+      "Pesan mingguan untuk pelanggan puas (rating 4+ bintang) agar mengajak teman-temannya.",
+    message: "Teks pesan — mendukung {name} dan {shop}",
+    enabled: "Aktif",
+    disabled: "Nonaktif",
+    saved: "Tersimpan",
+    quotaHint:
+      "{{used}} dari {{quota}} pesan gratis terpakai bulan ini — kelebihan dipotong dari saldo kampanye.",
+    runsEvery: "Berjalan maksimal sekali setiap {{days}} hari",
+  },
   unsubscribe: {
     title: "Berhenti berlangganan pemasaran",
     done: "Anda telah berhenti berlangganan pesan pemasaran.",

@@ -292,6 +292,33 @@ export const tl: Translations = {
       missyou: "Paalala",
     },
   },
+  automations: {
+    title: "Awtomatikong marketing",
+    subtitle:
+      "Hango sa «The 1-Page Marketing Plan»: gawing suki ang bawat bisita gamit ang awtomatikong WhatsApp na mensahe — walang manu-manong trabaho.",
+    proOnly: "Ang awtomatikong marketing ay para lang sa Pro — mag-upgrade sa subscription section sa itaas.",
+    phaseBefore: "Bago ang pagbisita: kumuha ng bagong customer gamit ang WhatsApp campaigns (campaigns section)",
+    phaseDuring: "Habang bumibisita: maayos na pila at booking na kahanga-hanga",
+    phaseAfter: "Pagkatapos bumisita: pabalikin sila nang paulit-ulit at kumuha ng referrals — awtomatiko",
+    winbackTitle: "Ibalik ang nawawalang customer",
+    winbackDesc:
+      "Awtomatikong WhatsApp na mensahe sa bawat customer na lumipas na sa itinakdang panahon — babalik sila nang kusa.",
+    winbackDays: "Araw ng pagkawala bago magmensahe",
+    vipTitle: "Gantimpalaan ang VIP na customer",
+    vipDesc:
+      "Buwanang mensahe sa pinakamadalas bumisita — pagpapahalagang nagpapatibay ng katapatan.",
+    vipMinVisits: "Minimum na bisita",
+    referralTitle: "Humingi ng referral",
+    referralDesc:
+      "Lingguhang mensahe sa masasayang customer (4+ na bituin) para isama ang kanilang mga kaibigan.",
+    message: "Teksto ng mensahe — suportado ang {name} at {shop}",
+    enabled: "Naka-on",
+    disabled: "Naka-off",
+    saved: "Na-save",
+    quotaHint:
+      "{{used}} sa {{quota}} libreng mensahe ang nagamit ngayong buwan — ang sobra ay ibabawas sa campaign balance.",
+    runsEvery: "Tumatakbo nang hindi hihigit sa isang beses bawat {{days}} araw",
+  },
   unsubscribe: {
     title: "Pag-unsubscribe sa marketing",
     done: "Na-unsubscribe ka na sa mga mensaheng marketing.",

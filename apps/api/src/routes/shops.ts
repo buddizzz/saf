@@ -489,6 +489,8 @@ shopRoutes.patch("/:id", requireAuth, async (c) => {
     return c.json({ error: "لا توجد حقول للتحديث" }, 400);
   }
 
+  updates.push("last_activity_at = unixepoch()");
+
   values.push(id);
   await c.env.DB.prepare(`UPDATE shops SET ${updates.join(", ")} WHERE id = ?`)
     .bind(...values)

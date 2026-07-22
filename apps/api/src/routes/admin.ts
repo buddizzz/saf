@@ -7,6 +7,9 @@ import { issueToken } from "../lib/jwt";
 import { periodEndForPlan } from "../lib/subscription";
 import { creditBalance, ensureShopBalance } from "../lib/billing";
 import { dispatchCampaign } from "../lib/campaigns";
+import { OFFLINE_THRESHOLD_DAYS, shopPresence } from "../lib/activity";
+import { runLifecycleCron } from "../cron/lifecycle";
+import { runCampaignCron } from "../cron/send-campaigns";
 import {
   generateTotpSecret,
   totpOtpauthUrl,
@@ -433,6 +436,99 @@ adminRoutes.get(
       .all();
 
     return c.json({ shops: results ?? [] });
+  },
+);
+
+// خريطة المحلات: متصل (نشاط خلال أسبوع) / غير متصل / موقوف — مع الإحداثيات.
+adminRoutes.get(
+  "/shops/map",
+  requireAdmin,
+  requireAdminRoles("super_admin", "ops_admin", "support_agent"),
+  async (c) => {
+    const { results } = await c.env.DB.prepare(
+      `SELECT id, name, slug, shop_type, subscription_tier, subscription_status,
+              is_active, is_accepting_queue, suspended_at, last_activity_at,
+              lat, lng, city_id, district_id, osm_display_name
+       FROM shops
+       LIMIT 1000`,
+    ).all<{
+      id: string;
+      name: string;
+      slug: string;
+      shop_type: string;
+      subscription_tier: string;
+      subscription_status: string;
+      is_active: number;
+      is_accepting_queue: number;
+      suspended_at: number | null;
+      last_activity_at: number | null;
+      lat: number | null;
+      lng: number | null;
+      city_id: string | null;
+      district_id: string | null;
+      osm_display_name: string | null;
+    }>();
+
+    const shops = (results ?? []).map((s) => ({
+      ...s,
+      presence: shopPresence(s),
+    }));
+
+    const counts = {
+      total: shops.length,
+      online: shops.filter((s) => s.presence === "online").length,
+      offline: shops.filter((s) => s.presence === "offline").length,
+      suspended: shops.filter((s) => s.presence === "suspended").length,
+      unlocated: shops.filter((s) => s.lat == null || s.lng == null).length,
+    };
+
+    return c.json({
+      shops,
+      counts,
+      offline_threshold_days: OFFLINE_THRESHOLD_DAYS,
+    });
+  },
+);
+
+// تنبيهات المنصة (غياب أسبوع، تجديد، انتهاء اشتراك…) المرسلة لأصحاب المحلات.
+adminRoutes.get(
+  "/notifications",
+  requireAdmin,
+  requireAdminRoles("super_admin", "ops_admin", "support_agent"),
+  async (c) => {
+    const type = c.req.query("type");
+    const clauses = ["1=1"];
+    const binds: unknown[] = [];
+    if (type) {
+      clauses.push("n.type = ?");
+      binds.push(type);
+    }
+    const { results } = await c.env.DB.prepare(
+      `SELECT n.id, n.shop_id, n.type, n.channel, n.message, n.status, n.error,
+              n.created_at, s.name AS shop_name, s.slug AS shop_slug
+       FROM shop_notifications n
+       JOIN shops s ON s.id = n.shop_id
+       WHERE ${clauses.join(" AND ")}
+       ORDER BY n.created_at DESC
+       LIMIT 100`,
+    )
+      .bind(...binds)
+      .all();
+    return c.json({ notifications: results ?? [] });
+  },
+);
+
+// تشغيل يدوي لدورات الأتمتة (دورة الحياة + الحملات) — للتشغيل والدعم.
+adminRoutes.post(
+  "/cron/run",
+  requireAdmin,
+  requireAdminRoles("super_admin", "ops_admin"),
+  async (c) => {
+    const admin = c.get("admin");
+    const lifecycle = await runLifecycleCron(c.env);
+    const campaigns = await runCampaignCron(c.env);
+    await audit(c.env.DB, admin.sub, "cron.manual_run", "platform", "cron");
+    return c.json({ ok: true, lifecycle, campaigns });
   },
 );
 

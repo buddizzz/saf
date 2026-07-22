@@ -2,6 +2,7 @@ import { FormEvent, useCallback, useEffect, useState } from "react";
 import { adminFetch } from "../lib/api";
 import { useAdminAuth } from "../lib/auth";
 import { TwoFactorSetupCard } from "./LoginPage";
+import { ShopsMap, type MapShop, type Presence } from "../components/ShopsMap";
 
 interface Overview {
   shops_total: number;
@@ -57,7 +58,36 @@ interface PendingCampaign {
   created_at: number;
 }
 
-type Tab = "overview" | "shops" | "campaigns" | "audit";
+interface MapCounts {
+  total: number;
+  online: number;
+  offline: number;
+  suspended: number;
+  unlocated: number;
+}
+
+interface PlatformNotification {
+  id: string;
+  shop_id: string;
+  shop_name: string;
+  shop_slug: string;
+  type: string;
+  channel: string;
+  message: string | null;
+  status: string;
+  error: string | null;
+  created_at: number;
+}
+
+const NOTIFICATION_TYPE_LABELS: Record<string, string> = {
+  offline_week: "غياب أسبوع",
+  trial_ending: "قرب انتهاء التجربة",
+  renewal_due_7d: "تجديد خلال 7 أيام",
+  renewal_due_1d: "تجديد خلال يوم",
+  subscription_expired: "انتهى الاشتراك",
+};
+
+type Tab = "overview" | "map" | "shops" | "campaigns" | "alerts" | "audit";
 
 export function DashboardPage() {
   const { admin, logout, mustEnroll2fa } = useAdminAuth();
@@ -75,6 +105,11 @@ export function DashboardPage() {
   const [creditAmount, setCreditAmount] = useState("100");
   const [creditReason, setCreditReason] = useState("");
   const [message, setMessage] = useState<string | null>(null);
+  const [mapShops, setMapShops] = useState<MapShop[]>([]);
+  const [mapCounts, setMapCounts] = useState<MapCounts | null>(null);
+  const [mapFilter, setMapFilter] = useState<Presence | "all">("all");
+  const [notifications, setNotifications] = useState<PlatformNotification[]>([]);
+  const [cronBusy, setCronBusy] = useState(false);
 
   const canWrite = admin?.role === "super_admin" || admin?.role === "ops_admin";
   const isSuper = admin?.role === "super_admin";
@@ -108,12 +143,40 @@ export function DashboardPage() {
     setPending(res.campaigns);
   }, [canWrite]);
 
+  const loadMap = useCallback(async () => {
+    const res = await adminFetch<{ shops: MapShop[]; counts: MapCounts }>(
+      "/admin/shops/map",
+    );
+    setMapShops(res.shops);
+    setMapCounts(res.counts);
+  }, []);
+
+  const loadNotifications = useCallback(async () => {
+    const res = await adminFetch<{ notifications: PlatformNotification[] }>(
+      "/admin/notifications",
+    );
+    setNotifications(res.notifications);
+  }, []);
+
   useEffect(() => {
     void loadOverview();
     void loadShops();
     void loadAudit();
     void loadPending();
-  }, [loadOverview, loadShops, loadAudit, loadPending]);
+    void loadMap();
+    void loadNotifications();
+  }, [loadOverview, loadShops, loadAudit, loadPending, loadMap, loadNotifications]);
+
+  const runCron = async () => {
+    setCronBusy(true);
+    try {
+      await adminFetch("/admin/cron/run", { method: "POST" });
+      setMessage("تم تشغيل دورات الأتمتة (دورة الحياة + الحملات)");
+      await Promise.all([loadNotifications(), loadMap(), loadOverview()]);
+    } finally {
+      setCronBusy(false);
+    }
+  };
 
   const suspend = async (e: FormEvent) => {
     e.preventDefault();
@@ -212,8 +275,10 @@ export function DashboardPage() {
         {(
           [
             ["overview", "نظرة عامة"],
+            ["map", "الخريطة"],
             ["shops", "المحلات"],
             ...(canWrite ? [["campaigns", "مراجعة الحملات"] as const] : []),
+            ["alerts", "التنبيهات"],
             ...(canWrite ? [["audit", "سجل التدقيق"] as const] : []),
           ] as Array<[Tab, string]>
         ).map(([id, label]) => (
@@ -260,6 +325,162 @@ export function DashboardPage() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {tab === "map" && (
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-ink-700/70">
+              متصل = نشاط خلال آخر 7 أيام (طابور أو تحديث من المالك). غير المتصل
+              لأسبوع يستلم تنبيه واتساب تلقائيًا.
+            </p>
+            {canWrite && (
+              <button
+                className="btn-ghost text-xs"
+                onClick={() => void runCron()}
+                disabled={cronBusy}
+              >
+                {cronBusy ? "جارٍ التشغيل…" : "تشغيل الأتمتة الآن"}
+              </button>
+            )}
+          </div>
+
+          {mapCounts && (
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              {(
+                [
+                  ["الإجمالي", mapCounts.total, "all"],
+                  ["متصلة", mapCounts.online, "online"],
+                  ["غير متصلة", mapCounts.offline, "offline"],
+                  ["موقوفة / معطّلة", mapCounts.suspended, "suspended"],
+                ] as Array<[string, number, Presence | "all"]>
+              ).map(([label, value, key]) => (
+                <button
+                  key={key}
+                  className={`panel text-right transition ${
+                    mapFilter === key ? "ring-2 ring-accent-500" : ""
+                  }`}
+                  onClick={() => setMapFilter(key)}
+                >
+                  <div className="text-xs font-semibold text-ink-700/60">
+                    {label}
+                  </div>
+                  <div
+                    className={`mt-1 font-mono text-3xl font-bold ${
+                      key === "online"
+                        ? "text-emerald-600"
+                        : key === "offline"
+                          ? "text-rose-600"
+                          : "text-ink-900"
+                    }`}
+                  >
+                    {value}
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+
+          <ShopsMap shops={mapShops} filter={mapFilter} />
+
+          <div className="flex flex-wrap gap-4 text-xs text-ink-700/70">
+            <span className="flex items-center gap-1.5">
+              <span className="h-3 w-3 rounded-full bg-emerald-500" /> متصل
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="h-3 w-3 rounded-full bg-rose-500" /> غير متصل (7+ أيام)
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="h-3 w-3 rounded-full bg-slate-400" /> موقوف / معطّل
+            </span>
+            {mapCounts && mapCounts.unlocated > 0 && (
+              <span>({mapCounts.unlocated} محل بدون إحداثيات لا يظهر على الخريطة)</span>
+            )}
+          </div>
+        </div>
+      )}
+
+      {tab === "alerts" && (
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-ink-700/70">
+              إشعارات المنصة المُرسلة لأصحاب المحلات عبر واتساب: غياب أسبوع، قرب
+              انتهاء التجربة، تذكير التجديد، وانتهاء الاشتراك.
+            </p>
+            {canWrite && (
+              <button
+                className="btn-ghost text-xs"
+                onClick={() => void runCron()}
+                disabled={cronBusy}
+              >
+                {cronBusy ? "جارٍ التشغيل…" : "تشغيل الأتمتة الآن"}
+              </button>
+            )}
+          </div>
+          {notifications.length === 0 ? (
+            <div className="panel text-sm text-ink-700/60">
+              لا توجد تنبيهات بعد — ستظهر هنا تلقائيًا مع دورة الأتمتة (كل 15 دقيقة)
+            </div>
+          ) : (
+            <div className="panel overflow-x-auto p-0">
+              <table className="w-full min-w-[640px] text-sm">
+                <thead className="border-b border-ink-100 bg-ink-50 text-xs text-ink-700/70">
+                  <tr>
+                    <th className="px-4 py-3 text-right font-semibold">المحل</th>
+                    <th className="px-4 py-3 text-right font-semibold">النوع</th>
+                    <th className="px-4 py-3 text-right font-semibold">الحالة</th>
+                    <th className="px-4 py-3 text-right font-semibold">الرسالة</th>
+                    <th className="px-4 py-3 text-right font-semibold">التاريخ</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {notifications.map((n) => (
+                    <tr key={n.id} className="border-b border-ink-50 align-top">
+                      <td className="px-4 py-3">
+                        <div className="font-semibold">{n.shop_name}</div>
+                        <div className="font-mono text-xs text-ink-700/60" dir="ltr">
+                          /{n.shop_slug}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                            n.type === "offline_week"
+                              ? "bg-rose-100 text-rose-800"
+                              : n.type === "subscription_expired"
+                                ? "bg-amber-100 text-amber-800"
+                                : "bg-ink-100 text-ink-700"
+                          }`}
+                        >
+                          {NOTIFICATION_TYPE_LABELS[n.type] ?? n.type}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        {n.status === "sent" ? (
+                          <span className="text-emerald-700">أُرسل</span>
+                        ) : n.status === "skipped" ? (
+                          <span className="text-ink-700/60">تخطّي (بدون رقم)</span>
+                        ) : (
+                          <span className="text-rose-600" title={n.error ?? ""}>
+                            فشل
+                          </span>
+                        )}
+                      </td>
+                      <td className="max-w-[320px] px-4 py-3 text-xs text-ink-700/70">
+                        <div className="line-clamp-3 whitespace-pre-wrap">
+                          {n.message ?? "—"}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-xs text-ink-700/60" dir="ltr">
+                        {new Date(n.created_at * 1000).toLocaleString("ar-SA")}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
 
