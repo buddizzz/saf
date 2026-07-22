@@ -56,6 +56,20 @@ function Feature({
   );
 }
 
+const ArrowIcon = (
+  <svg
+    width={16}
+    height={16}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={2.5}
+    className="rtl:rotate-180"
+  >
+    <path d="M5 12h14M13 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
 export function LandingPage() {
   const { t } = useTranslation();
   return (
@@ -79,10 +93,18 @@ export function LandingPage() {
       <main className="relative mx-auto max-w-6xl px-6">
         <section className="grid items-center gap-10 py-12 md:grid-cols-2 md:py-20">
           <div className="animate-fade-in">
-            <span className="mb-4 inline-flex items-center gap-1.5 rounded-full bg-gold-100 px-4 py-1.5 text-sm font-bold text-gold-700 shadow-sm">
-              <span className="h-1.5 w-1.5 rounded-full bg-gold-500" />
-              {t("common.tagline")}
-            </span>
+            <div className="mb-4 flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-gold-100 px-4 py-1.5 text-sm font-bold text-gold-700 shadow-sm">
+                <span className="h-1.5 w-1.5 rounded-full bg-gold-500" />
+                {t("common.tagline")}
+              </span>
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-800 py-1 pe-3 ps-1.5 text-xs font-bold text-white shadow-sm">
+                <span className="rounded-full bg-gold-400 px-2 py-0.5 text-[10px] font-extrabold text-brand-900">
+                  {t("landing.newBadgeTag")}
+                </span>
+                {t("landing.newBadgeText")}
+              </span>
+            </div>
             <h1 className="mb-5 text-4xl font-extrabold leading-tight tracking-tight text-brand-800 md:text-5xl">
               {t("landing.heroTitle")}
             </h1>
@@ -92,6 +114,7 @@ export function LandingPage() {
             <div className="flex flex-wrap gap-3">
               <Link to="/register" className="btn-primary">
                 {t("landing.ctaOwner")}
+                {ArrowIcon}
               </Link>
               <Link to="/login" className="btn-ghost">
                 {t("landing.ctaLogin")}
@@ -125,6 +148,23 @@ export function LandingPage() {
         </section>
 
         <section className="pb-20">
+          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-brand-900 via-brand-800 to-brand-700 px-6 py-14 shadow-soft sm:px-12">
+            <div className="pointer-events-none absolute -end-16 -top-16 h-56 w-56 rounded-full bg-gold-400/20 blur-3xl" />
+            <div className="pointer-events-none absolute -start-10 bottom-0 h-48 w-48 rounded-full bg-brand-400/30 blur-3xl" />
+            <div className="relative mb-10 text-center">
+              <h2 className="text-2xl font-extrabold text-white md:text-3xl">
+                {t("landing.statsTitle")}
+              </h2>
+            </div>
+            <div className="relative grid gap-4 sm:grid-cols-3">
+              <StatCard value={t("landing.stat1Value")} label={t("landing.stat1Label")} />
+              <StatCard value={t("landing.stat2Value")} label={t("landing.stat2Label")} />
+              <StatCard value={t("landing.stat3Value")} label={t("landing.stat3Label")} />
+            </div>
+          </div>
+        </section>
+
+        <section className="pb-20">
           <div className="overflow-hidden rounded-3xl bg-gradient-to-br from-brand-700 to-brand-900 px-8 py-12 text-center shadow-soft sm:px-16">
             <h2 className="mb-3 text-2xl font-extrabold text-white md:text-3xl">
               {t("landing.brandCtaTitle")}
@@ -142,6 +182,17 @@ export function LandingPage() {
       <footer className="border-t border-slate-100 py-8 text-center text-sm text-slate-400">
         صفّ — {t("common.tagline")}
       </footer>
+    </div>
+  );
+}
+
+function StatCard({ value, label }: { value: string; label: string }) {
+  return (
+    <div className="rounded-2xl bg-gold-50 px-6 py-6 text-center shadow-soft">
+      <div className="bg-gradient-to-br from-brand-700 to-brand-500 bg-clip-text text-4xl font-black text-transparent md:text-5xl">
+        {value}
+      </div>
+      <div className="mt-2 text-sm font-bold text-brand-800">{label}</div>
     </div>
   );
 }

@@ -117,7 +117,12 @@ export function AuthShell({
         <div className="pointer-events-none absolute -top-24 end-[-4rem] h-72 w-72 rounded-full bg-gold-400/20 blur-3xl" />
         <div className="pointer-events-none absolute bottom-[-4rem] start-[-2rem] h-72 w-72 rounded-full bg-brand-400/30 blur-3xl" />
         <div className="relative z-10 max-w-sm px-10 text-center text-white">
-          <Logo size={96} showWordmark={false} className="mx-auto mb-6" />
+          <Logo
+            size={72}
+            showTagline
+            inverted
+            className="mb-8 inline-flex rounded-2xl bg-white/10 px-5 py-4 backdrop-blur-sm"
+          />
           <p className="text-xl font-extrabold leading-relaxed">
             {t("auth.brandPitch")}
           </p>
