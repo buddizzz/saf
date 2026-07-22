@@ -224,7 +224,7 @@ export const en: Translations = {
   location: {
     title: "Location & campaign audience",
     subtitle:
-      "We store customer visits and shop location from the Saudi national address dataset (+ optional GPS) for future WhatsApp targeting.",
+      "We store customer visits and shop location from the Saudi national address dataset (+ optional GPS) for WhatsApp campaign targeting.",
     coords: "Coordinates",
     osm: "Resolved place",
     refreshGps: "Refresh location via GPS / Saudi dataset",
