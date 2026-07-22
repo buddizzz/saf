@@ -8,6 +8,8 @@ export const ar = {
     back: "رجوع",
   },
   landing: {
+    heroKicker: "منصة تنظيم الانتظار",
+    marqueeTitle: "صُمّم لكل الأنشطة التجارية",
     heroTitle: "نظّم طابور عملائك بلا فوضى",
     heroSubtitle:
       "أنشئ رمز QR لمحلك، وأدر قائمة الانتظار لحظيًا، وامنح عملاءك تجربة انتظار مريحة مع تنبيهات فورية.",
@@ -80,6 +82,13 @@ export const ar = {
       salon: "صالون",
       other: "أخرى",
     },
+    status: {
+      waiting: "بالانتظار",
+      called: "مستدعى",
+      served: "تمت الخدمة",
+      cancelled: "ملغى",
+      no_show: "لم يحضر",
+    },
   },
   queue: {
     joinTitle: "انضم إلى الطابور",
@@ -96,6 +105,9 @@ export const ar = {
     join: "انضم الآن",
     shopClosed: "المحل مغلق حاليًا",
     closedHint: "تابعنا لمعرفة موعد فتح الاستقبال مجددًا.",
+    openNow: "مفتوح الآن",
+    closedNow: "مغلق",
+    adBanner: "رقِّ محلك لباقة Pro — بدون إعلانات + حجز عن بُعد",
     yourNumber: "رقمك في الطابور",
     peopleAhead: "أمامك",
     person: "شخص",

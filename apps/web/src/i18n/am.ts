@@ -10,6 +10,8 @@ export const am: Translations = {
     back: "ተመለስ",
   },
   landing: {
+    heroKicker: "የወረፋ አስተዳደር መድረክ",
+    marqueeTitle: "ለሁሉም ዓይነት ንግድ የተሰራ",
     heroTitle: "የደንበኛ ወረፋዎን በቀላሉ ያደራጁ",
     heroSubtitle:
       "ለሱቅዎ የQR ኮድ ይፍጠሩ፣ የመጠበቂያ ዝርዝሩን በቀጥታ ያስተዳድሩ፣ እና ለደንበኞች በቅጽበት ማስጠንቀቂያዎች ምቹ መጠበቅ ይስጡ።",
@@ -82,6 +84,13 @@ export const am: Translations = {
       salon: "ሳሎን",
       other: "ሌላ",
     },
+    status: {
+      waiting: "በመጠበቅ ላይ",
+      called: "ተጠርቷል",
+      served: "አገልግሎት አግኝቷል",
+      cancelled: "ተሰርዟል",
+      no_show: "አልመጣም",
+    },
   },
   queue: {
     joinTitle: "ወደ ወረፋው ይቀላቀሉ",
@@ -98,6 +107,9 @@ export const am: Translations = {
     join: "አሁን ተቀላቀል",
     shopClosed: "ሱቁ በአሁኑ ጊዜ ዝግ ነው",
     closedHint: "መቼ እንደምንከፈት ለማየት በኋላ ይመልከቱ።",
+    openNow: "አሁን ክፍት ነው",
+    closedNow: "ዝግ ነው",
+    adBanner: "ሱቅዎን ወደ Pro ያሳድጉ — ያለ ማስታወቂያ + የርቀት ቀጠሮ",
     yourNumber: "የወረፋ ቁጥርዎ",
     peopleAhead: "ከፊትዎ ያሉ",
     person: "ሰዎች",

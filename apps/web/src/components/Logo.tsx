@@ -4,7 +4,6 @@ interface LogoProps {
   size?: number;
   showWordmark?: boolean;
   showTagline?: boolean;
-  variant?: "full" | "mark";
   /** استخدم ألوانًا فاتحة للوردمارك عند وضعه على خلفية داكنة. */
   inverted?: boolean;
   className?: string;
@@ -16,7 +15,6 @@ export function Logo({
   size = 40,
   showWordmark = true,
   showTagline = false,
-  variant = "full",
   inverted = false,
   className = "",
 }: LogoProps) {
@@ -71,7 +69,7 @@ export function Logo({
         <circle cx="80" cy="8.5" r="4.7" fill="#d18c34" />
         <rect x="74.7" y="13.5" width="10.6" height="14.8" rx="5.3" fill="#d18c34" />
       </svg>
-      {showWordmark && variant === "full" && (
+      {showWordmark && (
         <div className="leading-none">
           <div className={`text-3xl font-extrabold ${inverted ? "text-white" : "text-brand-800"}`}>
             صفّ

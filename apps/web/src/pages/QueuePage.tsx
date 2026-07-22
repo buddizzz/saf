@@ -166,6 +166,7 @@ function BrandMark({ shop, theme }: { shop: PublicShop; theme: Theme }) {
 }
 
 function ShopStatusBadge({ shop }: { shop: PublicShop }) {
+  const { t } = useTranslation();
   return (
     <span
       className={`mt-2 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-bold shadow-sm ${
@@ -179,7 +180,7 @@ function ShopStatusBadge({ shop }: { shop: PublicShop }) {
           shop.isOpen ? "bg-emerald-500 animate-pulse" : "bg-rose-500"
         }`}
       />
-      {shop.isOpen ? "🟢" : "🔴"}
+      {shop.isOpen ? t("queue.openNow") : t("queue.closedNow")}
     </span>
   );
 }
@@ -771,15 +772,16 @@ function RatingCard({
 }
 
 function AdBanner({ theme }: { theme: Theme }) {
+  const { t } = useTranslation();
   return (
     <a
       href="/login"
-      className="mt-auto flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-center text-sm font-bold text-white transition-transform hover:-translate-y-0.5"
+      className="mt-auto flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-center text-sm font-bold text-white transition-transform hover:-translate-y-0.5"
       style={{
         background: `linear-gradient(to left, ${theme.primaryDark}, ${theme.primary})`,
       }}
     >
-      رقِّ محلك لباقة Pro — بدون إعلانات + حجز عن بُعد
+      {t("queue.adBanner")}
     </a>
   );
 }

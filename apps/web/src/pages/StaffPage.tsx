@@ -101,7 +101,7 @@ function StaffLogin({
         <Logo size={34} />
         <LanguageSwitcher />
       </header>
-      <h1 className="mb-6 text-2xl font-extrabold text-brand-800">
+      <h1 className="mb-6 animate-fade-in text-3xl font-black tracking-tight text-brand-950">
         {t("staff.title")}
       </h1>
       <form onSubmit={submit} className="card space-y-4">
