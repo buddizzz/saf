@@ -401,32 +401,38 @@ adminRoutes.get(
     const binds: unknown[] = [];
 
     if (q) {
-      clauses.push("(name LIKE ? OR slug LIKE ? OR id = ?)");
-      binds.push(`%${q}%`, `%${q}%`, q);
+      clauses.push(
+        "(s.name LIKE ? OR s.slug LIKE ? OR s.id = ? OR o.email LIKE ? OR o.name LIKE ?)",
+      );
+      binds.push(`%${q}%`, `%${q}%`, q, `%${q}%`, `%${q}%`);
     }
     if (tier === "free" || tier === "pro") {
-      clauses.push("subscription_tier = ?");
+      clauses.push("s.subscription_tier = ?");
       binds.push(tier);
     }
     if (status === "suspended") {
-      clauses.push("suspended_at IS NOT NULL");
+      clauses.push("s.suspended_at IS NOT NULL");
     } else if (status === "active") {
-      clauses.push("suspended_at IS NULL AND is_active = 1");
+      clauses.push("s.suspended_at IS NULL AND s.is_active = 1");
     }
 
     binds.push(limit);
     const { results } = await c.env.DB.prepare(
-      `SELECT id, name, slug, shop_type, subscription_tier, subscription_status,
-              subscription_renews_at, is_active, suspended_at, suspend_reason, created_at,
-              country_code, city_id, district_id, lat, lng, osm_display_name, location_source
-       FROM shops
+      `SELECT s.id, s.name, s.slug, s.shop_type, s.subscription_tier, s.subscription_status,
+              s.subscription_renews_at, s.is_active, s.suspended_at, s.suspend_reason, s.created_at,
+              s.country_code, s.city_id, s.district_id, s.lat, s.lng, s.osm_display_name, s.location_source,
+              COALESCE(b.balance, 0) AS balance,
+              o.name AS owner_name, o.email AS owner_email
+       FROM shops s
+       LEFT JOIN shop_balance b ON b.shop_id = s.id
+       LEFT JOIN owners o ON o.id = s.owner_id
        WHERE ${clauses.join(" AND ")}
        ORDER BY
-         CASE WHEN city_id IS NULL THEN 1 ELSE 0 END,
-         city_id,
-         CASE WHEN district_id IS NULL THEN 1 ELSE 0 END,
-         district_id,
-         name
+         CASE WHEN s.city_id IS NULL THEN 1 ELSE 0 END,
+         s.city_id,
+         CASE WHEN s.district_id IS NULL THEN 1 ELSE 0 END,
+         s.district_id,
+         s.name
        LIMIT ?`,
     )
       .bind(...binds)
@@ -441,27 +447,121 @@ adminRoutes.get(
   requireAdmin,
   requireAdminRoles("super_admin", "ops_admin", "support_agent"),
   async (c) => {
+    const shopId = c.req.param("id");
     const shop = await c.env.DB.prepare("SELECT * FROM shops WHERE id = ?")
-      .bind(c.req.param("id"))
-      .first();
+      .bind(shopId)
+      .first<{
+        id: string;
+        owner_id: string;
+        city_id: string | null;
+        district_id: string | null;
+        [key: string]: unknown;
+      }>();
     if (!shop) return c.json({ error: "المحل غير موجود" }, 404);
+
+    const owner = await c.env.DB.prepare(
+      `SELECT id, name, email, created_at FROM owners WHERE id = ?`,
+    )
+      .bind(shop.owner_id)
+      .first();
 
     const staff = await c.env.DB.prepare(
       `SELECT id, name, role, is_active, created_at FROM staff WHERE shop_id = ?`,
     )
-      .bind(c.req.param("id"))
+      .bind(shopId)
       .all();
 
     const sub = await c.env.DB.prepare(
       `SELECT * FROM subscriptions WHERE shop_id = ? ORDER BY created_at DESC LIMIT 5`,
     )
-      .bind(c.req.param("id"))
+      .bind(shopId)
       .all();
 
+    const balance = await ensureShopBalance(c.env.DB, shopId);
+
+    const visits = await c.env.DB.prepare(
+      `SELECT COUNT(*) AS visit_count FROM customer_shop_visits WHERE shop_id = ?`,
+    )
+      .bind(shopId)
+      .first<{ visit_count: number }>();
+
+    const queueToday = await c.env.DB.prepare(
+      `SELECT
+         COUNT(*) AS total,
+         SUM(CASE WHEN status = 'waiting' THEN 1 ELSE 0 END) AS waiting,
+         SUM(CASE WHEN status = 'serving' THEN 1 ELSE 0 END) AS serving,
+         SUM(CASE WHEN status = 'done' THEN 1 ELSE 0 END) AS done
+       FROM queue_entries
+       WHERE shop_id = ? AND queue_date = date('now')`,
+    )
+      .bind(shopId)
+      .first();
+
+    const appointments = await c.env.DB.prepare(
+      `SELECT COUNT(*) AS upcoming FROM appointments
+       WHERE shop_id = ? AND status = 'confirmed' AND appointment_time >= unixepoch()`,
+    )
+      .bind(shopId)
+      .first<{ upcoming: number }>();
+
+    const openReports = await c.env.DB.prepare(
+      `SELECT COUNT(*) AS open_reports FROM shop_reports
+       WHERE shop_id = ? AND status = 'open'`,
+    )
+      .bind(shopId)
+      .first<{ open_reports: number }>();
+
+    const campaigns = await c.env.DB.prepare(
+      `SELECT id, name, status, audience_type, audience_count, cost, created_at, sent_at
+       FROM campaigns WHERE shop_id = ? ORDER BY created_at DESC LIMIT 10`,
+    )
+      .bind(shopId)
+      .all();
+
+    const payments = await c.env.DB.prepare(
+      `SELECT id, amount, bonus_amount, provider, status, note, created_at
+       FROM payments WHERE shop_id = ? ORDER BY created_at DESC LIMIT 10`,
+    )
+      .bind(shopId)
+      .all();
+
+    let cityName: string | null = null;
+    let districtName: string | null = null;
+    if (shop.city_id) {
+      const city = await c.env.DB.prepare(
+        `SELECT name_ar FROM cities WHERE id = ?`,
+      )
+        .bind(shop.city_id)
+        .first<{ name_ar: string }>();
+      cityName = city?.name_ar ?? null;
+    }
+    if (shop.district_id) {
+      const district = await c.env.DB.prepare(
+        `SELECT name_ar FROM districts WHERE id = ?`,
+      )
+        .bind(shop.district_id)
+        .first<{ name_ar: string }>();
+      districtName = district?.name_ar ?? null;
+    }
+
     return c.json({
-      shop,
+      shop: {
+        ...shop,
+        city_name: cityName,
+        district_name: districtName,
+      },
+      owner,
       staff: staff.results ?? [],
       subscriptions: sub.results ?? [],
+      balance,
+      stats: {
+        visit_count: visits?.visit_count ?? 0,
+        queue_today: queueToday ?? { total: 0, waiting: 0, serving: 0, done: 0 },
+        upcoming_appointments: appointments?.upcoming ?? 0,
+        open_reports: openReports?.open_reports ?? 0,
+      },
+      recent_campaigns: campaigns.results ?? [],
+      recent_payments: payments.results ?? [],
     });
   },
 );
@@ -657,13 +757,34 @@ adminRoutes.get(
   requireAdmin,
   requireAdminRoles("super_admin", "ops_admin"),
   async (c) => {
+    const action = (c.req.query("action") ?? "").trim();
+    const q = (c.req.query("q") ?? "").trim();
+    const limit = Math.min(Number(c.req.query("limit") ?? 100), 200);
+
+    const clauses: string[] = ["1=1"];
+    const binds: unknown[] = [];
+    if (action) {
+      clauses.push("a.action LIKE ?");
+      binds.push(`${action}%`);
+    }
+    if (q) {
+      clauses.push(
+        "(a.target_id LIKE ? OR a.reason LIKE ? OR u.email LIKE ? OR a.action LIKE ?)",
+      );
+      binds.push(`%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`);
+    }
+    binds.push(limit);
+
     const { results } = await c.env.DB.prepare(
       `SELECT a.*, u.email AS admin_email
        FROM admin_audit_log a
        LEFT JOIN admin_users u ON u.id = a.admin_id
+       WHERE ${clauses.join(" AND ")}
        ORDER BY a.created_at DESC
-       LIMIT 100`,
-    ).all();
+       LIMIT ?`,
+    )
+      .bind(...binds)
+      .all();
     return c.json({ entries: results ?? [] });
   },
 );
@@ -981,5 +1102,211 @@ adminRoutes.get(
     if (!shop) return c.json({ error: "المحل غير موجود" }, 404);
     const bal = await ensureShopBalance(c.env.DB, c.req.param("id"));
     return c.json({ balance: bal });
+  },
+);
+
+// —— حملات: قائمة كاملة + تفاصيل إحصاء الإرسال ——
+adminRoutes.get(
+  "/campaigns",
+  requireAdmin,
+  requireAdminRoles("super_admin", "ops_admin"),
+  async (c) => {
+    const status = (c.req.query("status") ?? "").trim();
+    const q = (c.req.query("q") ?? "").trim();
+    const limit = Math.min(Number(c.req.query("limit") ?? 50), 100);
+
+    const clauses: string[] = ["1=1"];
+    const binds: unknown[] = [];
+    if (status) {
+      clauses.push("c.status = ?");
+      binds.push(status);
+    }
+    if (q) {
+      clauses.push("(c.name LIKE ? OR s.name LIKE ? OR s.slug LIKE ? OR c.id = ?)");
+      binds.push(`%${q}%`, `%${q}%`, `%${q}%`, q);
+    }
+    binds.push(limit);
+
+    const { results } = await c.env.DB.prepare(
+      `SELECT c.*, s.name AS shop_name, s.slug AS shop_slug,
+              (SELECT COUNT(*) FROM campaign_messages m WHERE m.campaign_id = c.id AND m.status = 'sent') AS messages_sent,
+              (SELECT COUNT(*) FROM campaign_messages m WHERE m.campaign_id = c.id AND m.status = 'failed') AS messages_failed,
+              (SELECT COUNT(*) FROM campaign_messages m WHERE m.campaign_id = c.id) AS messages_total
+       FROM campaigns c
+       JOIN shops s ON s.id = c.shop_id
+       WHERE ${clauses.join(" AND ")}
+       ORDER BY c.created_at DESC
+       LIMIT ?`,
+    )
+      .bind(...binds)
+      .all();
+
+    return c.json({ campaigns: results ?? [] });
+  },
+);
+
+adminRoutes.get(
+  "/campaigns/:id",
+  requireAdmin,
+  requireAdminRoles("super_admin", "ops_admin"),
+  async (c) => {
+    const campaign = await c.env.DB.prepare(
+      `SELECT c.*, s.name AS shop_name, s.slug AS shop_slug
+       FROM campaigns c
+       JOIN shops s ON s.id = c.shop_id
+       WHERE c.id = ?`,
+    )
+      .bind(c.req.param("id"))
+      .first();
+    if (!campaign) return c.json({ error: "الحملة غير موجودة" }, 404);
+
+    const breakdown = await c.env.DB.prepare(
+      `SELECT status, COUNT(*) AS count
+       FROM campaign_messages WHERE campaign_id = ?
+       GROUP BY status`,
+    )
+      .bind(c.req.param("id"))
+      .all();
+
+    return c.json({
+      campaign,
+      message_breakdown: breakdown.results ?? [],
+    });
+  },
+);
+
+// —— مالية: مدفوعات + أرصدة ——
+adminRoutes.get(
+  "/payments",
+  requireAdmin,
+  requireAdminRoles("super_admin", "ops_admin"),
+  async (c) => {
+    const q = (c.req.query("q") ?? "").trim();
+    const limit = Math.min(Number(c.req.query("limit") ?? 50), 100);
+    const clauses: string[] = ["1=1"];
+    const binds: unknown[] = [];
+    if (q) {
+      clauses.push("(s.name LIKE ? OR s.slug LIKE ? OR p.note LIKE ? OR p.id = ?)");
+      binds.push(`%${q}%`, `%${q}%`, `%${q}%`, q);
+    }
+    binds.push(limit);
+
+    const { results } = await c.env.DB.prepare(
+      `SELECT p.*, s.name AS shop_name, s.slug AS shop_slug
+       FROM payments p
+       JOIN shops s ON s.id = p.shop_id
+       WHERE ${clauses.join(" AND ")}
+       ORDER BY p.created_at DESC
+       LIMIT ?`,
+    )
+      .bind(...binds)
+      .all();
+
+    return c.json({ payments: results ?? [] });
+  },
+);
+
+adminRoutes.get(
+  "/finance/overview",
+  requireAdmin,
+  requireAdminRoles("super_admin", "ops_admin"),
+  async (c) => {
+    const balances = await c.env.DB.prepare(
+      `SELECT
+         COUNT(*) AS shops_with_balance,
+         COALESCE(SUM(balance), 0) AS total_balance
+       FROM shop_balance`,
+    ).first();
+
+    const payments = await c.env.DB.prepare(
+      `SELECT
+         COALESCE(SUM(CASE WHEN amount > 0 AND status = 'completed' THEN amount ELSE 0 END), 0) AS credited,
+         COALESCE(SUM(CASE WHEN amount < 0 AND status = 'completed' THEN ABS(amount) ELSE 0 END), 0) AS debited,
+         COALESCE(SUM(CASE WHEN status = 'completed' THEN bonus_amount ELSE 0 END), 0) AS bonuses,
+         COUNT(*) AS payment_count
+       FROM payments`,
+    ).first();
+
+    const spend = await c.env.DB.prepare(
+      `SELECT COALESCE(SUM(cost), 0) AS campaign_spend
+       FROM campaigns
+       WHERE status IN ('completed', 'sending', 'scheduled')`,
+    ).first();
+
+    return c.json({
+      finance: {
+        ...balances,
+        ...payments,
+        ...spend,
+      },
+    });
+  },
+);
+
+// —— كلمات محظورة ——
+adminRoutes.get(
+  "/banned-words",
+  requireAdmin,
+  requireAdminRoles("super_admin", "ops_admin"),
+  async (c) => {
+    const { results } = await c.env.DB.prepare(
+      `SELECT word, created_at FROM campaign_banned_words ORDER BY word`,
+    ).all();
+    return c.json({ words: results ?? [] });
+  },
+);
+
+adminRoutes.post(
+  "/banned-words",
+  requireAdmin,
+  requireAdminRoles("super_admin", "ops_admin"),
+  async (c) => {
+    const admin = c.get("admin");
+    const body = await c.req.json().catch(() => ({}));
+    const err = requireFields(body, ["word"]);
+    if (err) return c.json({ error: err }, 400);
+    const word = String(body.word).trim().toLowerCase();
+    if (!word) return c.json({ error: "الكلمة فارغة" }, 400);
+
+    await c.env.DB.prepare(
+      `INSERT OR IGNORE INTO campaign_banned_words (word) VALUES (?)`,
+    )
+      .bind(word)
+      .run();
+
+    await audit(c.env.DB, admin.sub, "banned_word.add", "banned_word", word);
+    return c.json({ ok: true }, 201);
+  },
+);
+
+adminRoutes.delete(
+  "/banned-words/:word",
+  requireAdmin,
+  requireAdminRoles("super_admin", "ops_admin"),
+  async (c) => {
+    const admin = c.get("admin");
+    const word = decodeURIComponent(c.req.param("word"));
+    await c.env.DB.prepare(`DELETE FROM campaign_banned_words WHERE word = ?`)
+      .bind(word)
+      .run();
+    await audit(c.env.DB, admin.sub, "banned_word.remove", "banned_word", word);
+    return c.json({ ok: true });
+  },
+);
+
+// —— أحياء حسب المدينة ——
+adminRoutes.get(
+  "/locations/districts",
+  requireAdmin,
+  requireAdminRoles("super_admin", "ops_admin"),
+  async (c) => {
+    const cityId = c.req.query("city_id");
+    if (!cityId) return c.json({ error: "city_id مطلوب" }, 400);
+    const { results } = await c.env.DB.prepare(
+      `SELECT * FROM districts WHERE city_id = ? ORDER BY name_ar`,
+    )
+      .bind(cityId)
+      .all();
+    return c.json({ districts: results ?? [] });
   },
 );
