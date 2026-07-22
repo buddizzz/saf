@@ -278,7 +278,10 @@ export async function dispatchCampaign(
     })}\n\nلإلغاء الاشتراك: ${origin}/unsubscribe/${unsub}`;
 
     try {
-      const wa = await sendWhatsAppMessage(env, person.phone, body);
+      const wa = await sendWhatsAppMessage(env, person.phone, body, {
+        customerName: person.name,
+        shopName: campaign.shop_name,
+      });
       await env.DB.prepare(
         `INSERT INTO campaign_messages
            (id, campaign_id, phone_hash, status, wa_message_id, sent_at)

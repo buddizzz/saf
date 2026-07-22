@@ -296,6 +296,12 @@ export const ar = {
     deleted: "تم حذف بياناتك.",
     invalid: "رابط غير صالح.",
   },
+  pwa: {
+    installTitle: "ثبّت صفّ على شاشتك",
+    installBody: "للوصول السريع وإبقاء الشاشة مستيقظة أثناء إدارة الطابور.",
+    installCta: "تثبيت",
+    wakeOn: "الشاشة ستبقى مستيقظة أثناء إدارة الطابور",
+  },
 };
 
 export type Translations = typeof ar;

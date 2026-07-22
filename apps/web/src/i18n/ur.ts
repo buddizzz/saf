@@ -301,4 +301,10 @@ export const ur: Translations = {
     deleted: "آپ کا ڈیٹا حذف کر دیا گیا۔",
     invalid: "غلط لنک۔",
   },
+  pwa: {
+    installTitle: "SAF کو ہوم اسکرین پر انسٹال کریں",
+    installBody: "قطار منظم کرتے وقت فوری رسائی اور اسکرین بیدار رکھیں۔",
+    installCta: "انسٹال",
+    wakeOn: "قطار کی نگرانی کے دوران اسکرین بیدار رہے گی",
+  },
 };

@@ -11,11 +11,9 @@ build/
 .wrangler/
 .dev.vars
 .dev.vars.*
-
-# Env
-.env
-.env.*
+!**/.dev.vars.example
 !.env.example
+!**/.env.example
 
 # Logs
 *.log

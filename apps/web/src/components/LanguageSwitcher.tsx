@@ -3,22 +3,23 @@ import { SUPPORTED_LANGUAGES } from "../i18n";
 
 export function LanguageSwitcher() {
   const { i18n } = useTranslation();
+  const current = (i18n.language || "ar").split("-")[0];
+
   return (
-    <div className="flex items-center gap-1 rounded-full border border-brand-100 bg-white p-1 text-sm">
-      {SUPPORTED_LANGUAGES.map((lang) => (
-        <button
-          key={lang.code}
-          type="button"
-          onClick={() => void i18n.changeLanguage(lang.code)}
-          className={`rounded-full px-3 py-1 font-bold transition ${
-            i18n.language === lang.code
-              ? "bg-brand-600 text-white"
-              : "text-brand-700 hover:bg-brand-50"
-          }`}
-        >
-          {lang.label}
-        </button>
-      ))}
-    </div>
+    <label className="inline-flex items-center gap-2 text-sm">
+      <span className="sr-only">Language</span>
+      <select
+        className="rounded-xl border border-brand-100 bg-white px-3 py-1.5 font-bold text-brand-800 shadow-sm"
+        value={current}
+        onChange={(e) => void i18n.changeLanguage(e.target.value)}
+        aria-label="Language"
+      >
+        {SUPPORTED_LANGUAGES.map((lang) => (
+          <option key={lang.code} value={lang.code}>
+            {lang.label}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }

@@ -16,6 +16,8 @@ export interface VisitCustomerInput {
   /** إحداثيات اختيارية من جهاز العميل عند الانضمام */
   lat?: number | null;
   lng?: number | null;
+  /** نسخة AES-GCM مشفّرة إن وُجد مفتاح التشفير */
+  phoneCipher?: string | null;
 }
 
 /**
@@ -33,6 +35,7 @@ export async function recordCustomerVisit(
   const marketing = input.marketingConsent ? 1 : 0;
   const lat = input.lat ?? shop.lat ?? null;
   const lng = input.lng ?? shop.lng ?? null;
+  const phoneCipher = input.phoneCipher ?? null;
 
   await db
     .prepare(
@@ -40,8 +43,8 @@ export async function recordCustomerVisit(
          phone, name, gender, age_category,
          last_country_code, last_city_id, last_district_id,
          last_lat, last_lng,
-         marketing_consent, last_visit_at
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         marketing_consent, last_visit_at, phone_cipher
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(phone) DO UPDATE SET
          name = excluded.name,
          gender = COALESCE(excluded.gender, customers.gender),
@@ -51,6 +54,7 @@ export async function recordCustomerVisit(
          last_district_id = COALESCE(excluded.last_district_id, customers.last_district_id),
          last_lat = COALESCE(excluded.last_lat, customers.last_lat),
          last_lng = COALESCE(excluded.last_lng, customers.last_lng),
+         phone_cipher = COALESCE(excluded.phone_cipher, customers.phone_cipher),
          marketing_consent = CASE
            WHEN excluded.marketing_consent = 1 THEN 1
            ELSE customers.marketing_consent
@@ -69,6 +73,7 @@ export async function recordCustomerVisit(
       lng,
       marketing,
       now,
+      phoneCipher,
     )
     .run();
 

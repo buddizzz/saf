@@ -3,6 +3,8 @@ import type { AppEnv } from "../lib/http";
 import { isValidSaudiPhone, requireFields } from "../lib/http";
 import { isWithinWorkingHours } from "../lib/hours";
 import { requireAuth } from "../middleware/auth";
+import { encryptPhone } from "../lib/phone-crypto";
+import { clientIp, rateLimit } from "../lib/rate-limit";
 import {
   callNext,
   completeCurrent,
@@ -37,6 +39,15 @@ async function canControlShop(
 
 // انضمام عميل للطابور عبر رابط المحل.
 queueRoutes.post("/join", async (c) => {
+  const ip = clientIp(c);
+  const rl = rateLimit(`queue-join:${ip}`, 30, 60_000);
+  if (!rl.ok) {
+    return c.json(
+      { error: "محاولات كثيرة، حاول لاحقًا", retry_after: rl.retryAfterSec },
+      429,
+    );
+  }
+
   const body = await c.req.json().catch(() => ({}));
   const err = requireFields(body, ["slug", "name", "phone"]);
   if (err) return c.json({ error: err }, 400);
@@ -72,6 +83,8 @@ queueRoutes.post("/join", async (c) => {
   const customerLng =
     typeof body.lng === "number" && Number.isFinite(body.lng) ? body.lng : null;
 
+  const phoneCipher = await encryptPhone(c.env, body.phone);
+
   const entry = await joinQueue(c.env.DB, shop.id, {
     name: body.name,
     phone: body.phone,
@@ -81,6 +94,7 @@ queueRoutes.post("/join", async (c) => {
     marketingConsent: body.marketing_consent === true,
     lat: customerLat,
     lng: customerLng,
+    phoneCipher,
   });
 
   await stubFor(c, shop.id).broadcast(shop.id);

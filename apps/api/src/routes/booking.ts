@@ -4,6 +4,7 @@ import { isValidSaudiPhone, requireFields } from "../lib/http";
 import { randomToken } from "../lib/crypto";
 import { generateId } from "../lib/slug";
 import { recordCustomerVisit } from "../lib/visits";
+import { encryptPhone } from "../lib/phone-crypto";
 import {
   addDaysUTC,
   buildSlotsForDay,
@@ -317,6 +318,7 @@ bookingRoutes.post("/appointments", async (c) => {
     marketingConsent: body.marketing_consent === true,
     lat: typeof body.lat === "number" ? body.lat : null,
     lng: typeof body.lng === "number" ? body.lng : null,
+    phoneCipher: await encryptPhone(c.env, body.phone),
   });
 
   const id = generateId("appt");

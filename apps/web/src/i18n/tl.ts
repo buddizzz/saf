@@ -301,4 +301,10 @@ export const tl: Translations = {
     deleted: "Nabura ang iyong data.",
     invalid: "Hindi wastong link.",
   },
+  pwa: {
+    installTitle: "I-install ang SAF sa home screen",
+    installBody: "Mabilis na access at panatilihing gising ang screen habang pinamamahalaan ang pila.",
+    installCta: "I-install",
+    wakeOn: "Mananatiling gising ang screen habang pinamamahalaan ang pila",
+  },
 };

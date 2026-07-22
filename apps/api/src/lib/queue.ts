@@ -67,6 +67,7 @@ export interface JoinInput {
   marketingConsent?: boolean;
   lat?: number | null;
   lng?: number | null;
+  phoneCipher?: string | null;
 }
 
 export async function joinQueue(
@@ -105,6 +106,7 @@ export async function joinQueue(
     marketingConsent: input.marketingConsent,
     lat: input.lat,
     lng: input.lng,
+    phoneCipher: input.phoneCipher,
   });
 
   const maxRow = await db

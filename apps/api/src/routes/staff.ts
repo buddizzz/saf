@@ -3,11 +3,17 @@ import type { AppEnv } from "../lib/http";
 import { requireFields } from "../lib/http";
 import { verifyPassword } from "../lib/crypto";
 import { issueToken } from "../lib/jwt";
+import { clientIp, rateLimit } from "../lib/rate-limit";
 
 export const staffRoutes = new Hono<AppEnv>();
 
-// دخول الموظف عبر رمز PIN ضمن نطاق محل واحد.
 staffRoutes.post("/login", async (c) => {
+  const ip = clientIp(c);
+  const rl = rateLimit(`staff-login:${ip}`, 5, 60_000, { lockMs: 60_000 });
+  if (!rl.ok) {
+    return c.json({ error: "محاولات كثيرة", retry_after: rl.retryAfterSec }, 429);
+  }
+
   const body = await c.req.json().catch(() => ({}));
   const err = requireFields(body, ["slug", "pin"]);
   if (err) return c.json({ error: err }, 400);

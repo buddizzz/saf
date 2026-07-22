@@ -1,12 +1,18 @@
 import { Hono } from "hono";
 import type { AppEnv } from "../lib/http";
 import { isValidEmail, requireFields } from "../lib/http";
-import { hashPassword, verifyPassword } from "../lib/crypto";
+import { hashPassword, needsRehash, verifyPassword } from "../lib/crypto";
 import { generateId } from "../lib/slug";
 import { issueToken } from "../lib/jwt";
 import { periodEndForPlan } from "../lib/subscription";
 import { creditBalance, ensureShopBalance } from "../lib/billing";
 import { dispatchCampaign } from "../lib/campaigns";
+import {
+  generateTotpSecret,
+  totpOtpauthUrl,
+  verifyTotp,
+} from "../lib/totp";
+import { clientIp, rateLimit } from "../lib/rate-limit";
 import {
   requireAdmin,
   requireAdminRoles,
@@ -53,9 +59,10 @@ adminRoutes.post("/auth/bootstrap", async (c) => {
 
   const id = generateId("adm");
   const passwordHash = await hashPassword(body.password);
+  // يُنشأ بدون 2FA ثم يُطلب التفعيل فور أول دخول
   await c.env.DB.prepare(
-    `INSERT INTO admin_users (id, email, password_hash, name, role)
-     VALUES (?, ?, ?, ?, 'super_admin')`,
+    `INSERT INTO admin_users (id, email, password_hash, name, role, totp_enabled)
+     VALUES (?, ?, ?, ?, 'super_admin', 0)`,
   )
     .bind(id, body.email.toLowerCase(), passwordHash, body.name)
     .run();
@@ -75,19 +82,31 @@ adminRoutes.post("/auth/bootstrap", async (c) => {
         email: body.email.toLowerCase(),
         name: body.name,
         role: "super_admin" as AdminRole,
+        totp_enabled: false,
       },
+      must_enroll_2fa: true,
     },
     201,
   );
 });
 
 adminRoutes.post("/auth/login", async (c) => {
+  const ip = clientIp(c);
+  const rl = rateLimit(`admin-login:${ip}`, 5, 60_000, { lockMs: 60_000 });
+  if (!rl.ok) {
+    return c.json(
+      { error: "محاولات كثيرة، حاول لاحقًا", retry_after: rl.retryAfterSec },
+      429,
+    );
+  }
+
   const body = await c.req.json().catch(() => ({}));
   const err = requireFields(body, ["email", "password"]);
   if (err) return c.json({ error: err }, 400);
 
   const admin = await c.env.DB.prepare(
-    `SELECT id, email, name, role, password_hash, is_active
+    `SELECT id, email, name, role, password_hash, is_active,
+            totp_secret, totp_enabled, locked_until, failed_login_count
      FROM admin_users WHERE email = ?`,
   )
     .bind(String(body.email).toLowerCase())
@@ -98,14 +117,121 @@ adminRoutes.post("/auth/login", async (c) => {
       role: AdminRole;
       password_hash: string;
       is_active: number;
+      totp_secret: string | null;
+      totp_enabled: number;
+      locked_until: number | null;
+      failed_login_count: number;
     }>();
+
+  const now = Math.floor(Date.now() / 1000);
+  if (admin?.locked_until && admin.locked_until > now) {
+    return c.json({ error: "الحساب مقفل مؤقتًا", retry_after: admin.locked_until - now }, 429);
+  }
 
   if (
     !admin ||
     admin.is_active !== 1 ||
     !(await verifyPassword(body.password, admin.password_hash))
   ) {
+    if (admin) {
+      const fails = (admin.failed_login_count ?? 0) + 1;
+      const lockedUntil = fails >= 5 ? now + 15 * 60 : null;
+      await c.env.DB.prepare(
+        `UPDATE admin_users SET failed_login_count = ?, locked_until = ? WHERE id = ?`,
+      )
+        .bind(fails, lockedUntil, admin.id)
+        .run();
+      await audit(c.env.DB, admin.id, "auth.login_failed", "admin", admin.id, ip);
+    }
     return c.json({ error: "بيانات الدخول غير صحيحة" }, 401);
+  }
+
+  await c.env.DB.prepare(
+    `UPDATE admin_users SET failed_login_count = 0, locked_until = NULL WHERE id = ?`,
+  )
+    .bind(admin.id)
+    .run();
+
+  if (needsRehash(admin.password_hash)) {
+    const next = await hashPassword(body.password);
+    await c.env.DB.prepare(`UPDATE admin_users SET password_hash = ? WHERE id = ?`)
+      .bind(next, admin.id)
+      .run();
+  }
+
+  // إن كان 2FA مفعّلًا: لا تُصدر JWT كامل إلا بعد الرمز
+  if (admin.totp_enabled === 1 && admin.totp_secret) {
+    const pending = await issueToken(
+      c.env.JWT_SECRET,
+      {
+        sub: admin.id,
+        email: admin.email,
+        role: "admin",
+        adminRole: admin.role,
+        pending2fa: true,
+      },
+      300,
+    );
+    return c.json({
+      requires_2fa: true,
+      pending_token: pending,
+      admin: { id: admin.id, email: admin.email, name: admin.name, role: admin.role },
+    });
+  }
+
+  const token = await issueToken(c.env.JWT_SECRET, {
+    sub: admin.id,
+    email: admin.email,
+    role: "admin",
+    adminRole: admin.role,
+  });
+
+  return c.json({
+    token,
+    requires_2fa: false,
+    must_enroll_2fa: admin.totp_enabled !== 1,
+    admin: {
+      id: admin.id,
+      email: admin.email,
+      name: admin.name,
+      role: admin.role,
+      totp_enabled: admin.totp_enabled === 1,
+    },
+  });
+});
+
+adminRoutes.post("/auth/2fa/verify", async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  const err = requireFields(body, ["pending_token", "code"]);
+  if (err) return c.json({ error: err }, 400);
+
+  const { readToken } = await import("../lib/jwt");
+  const payload = await readToken(c.env.JWT_SECRET, body.pending_token);
+  if (!payload || payload.role !== "admin" || !payload.pending2fa) {
+    return c.json({ error: "رمز مؤقت غير صالح" }, 401);
+  }
+
+  const admin = await c.env.DB.prepare(
+    `SELECT id, email, name, role, totp_secret, totp_enabled, is_active
+     FROM admin_users WHERE id = ?`,
+  )
+    .bind(payload.sub)
+    .first<{
+      id: string;
+      email: string;
+      name: string;
+      role: AdminRole;
+      totp_secret: string | null;
+      totp_enabled: number;
+      is_active: number;
+    }>();
+
+  if (!admin || admin.is_active !== 1 || !admin.totp_secret) {
+    return c.json({ error: "غير مصرّح" }, 401);
+  }
+  if (!(await verifyTotp(admin.totp_secret, String(body.code)))) {
+    await audit(c.env.DB, admin.id, "auth.2fa_failed", "admin", admin.id);
+    return c.json({ error: "رمز التحقق غير صحيح" }, 401);
   }
 
   const token = await issueToken(c.env.JWT_SECRET, {
@@ -122,14 +248,62 @@ adminRoutes.post("/auth/login", async (c) => {
       email: admin.email,
       name: admin.name,
       role: admin.role,
+      totp_enabled: true,
     },
   });
 });
 
+adminRoutes.post("/auth/2fa/setup", requireAdmin, async (c) => {
+  const auth = c.get("admin");
+  const secret = generateTotpSecret();
+  await c.env.DB.prepare(
+    `UPDATE admin_users SET totp_secret = ?, totp_enabled = 0 WHERE id = ?`,
+  )
+    .bind(secret, auth.sub)
+    .run();
+
+  return c.json({
+    secret,
+    otpauth_url: totpOtpauthUrl({ secret, email: auth.email }),
+  });
+});
+
+adminRoutes.post("/auth/2fa/enable", requireAdmin, async (c) => {
+  const auth = c.get("admin");
+  const body = await c.req.json().catch(() => ({}));
+  const err = requireFields(body, ["code"]);
+  if (err) return c.json({ error: err }, 400);
+
+  const admin = await c.env.DB.prepare(
+    `SELECT totp_secret FROM admin_users WHERE id = ?`,
+  )
+    .bind(auth.sub)
+    .first<{ totp_secret: string | null }>();
+  if (!admin?.totp_secret) {
+    return c.json({ error: "ابدأ بإعداد 2FA أولًا" }, 400);
+  }
+  if (!(await verifyTotp(admin.totp_secret, String(body.code)))) {
+    return c.json({ error: "رمز التحقق غير صحيح" }, 401);
+  }
+
+  const now = Math.floor(Date.now() / 1000);
+  await c.env.DB.prepare(
+    `UPDATE admin_users SET totp_enabled = 1, totp_enrolled_at = ? WHERE id = ?`,
+  )
+    .bind(now, auth.sub)
+    .run();
+  await audit(c.env.DB, auth.sub, "auth.2fa_enabled", "admin", auth.sub);
+
+  return c.json({ ok: true, totp_enabled: true });
+});
+
 adminRoutes.get("/auth/me", requireAdmin, async (c) => {
   const auth = c.get("admin");
+  if (auth.pending2fa) {
+    return c.json({ error: "أكمل التحقق بخطوتين" }, 401);
+  }
   const admin = await c.env.DB.prepare(
-    `SELECT id, email, name, role, is_active FROM admin_users WHERE id = ?`,
+    `SELECT id, email, name, role, is_active, totp_enabled FROM admin_users WHERE id = ?`,
   )
     .bind(auth.sub)
     .first();

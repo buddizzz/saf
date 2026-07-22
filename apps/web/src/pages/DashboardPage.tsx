@@ -9,6 +9,7 @@ import { Logo } from "../components/Logo";
 import { LanguageSwitcher } from "../components/LanguageSwitcher";
 import { SettingsPanel } from "../components/SettingsPanel";
 import { ShopAvatar } from "../components/ShopAvatar";
+import { InstallHint, useWakeLock } from "../hooks/useWakeLock";
 import type { Shop } from "../lib/types";
 
 export function DashboardPage() {
@@ -102,6 +103,7 @@ export function DashboardPage() {
           </div>
         )}
       </main>
+      <InstallHint />
     </div>
   );
 }
@@ -111,6 +113,7 @@ function ShopManager({ shop, onChange }: { shop: Shop; onChange: () => void }) {
   const { snapshot } = useQueueWebSocket(shop.id);
   const [accepting, setAccepting] = useState(shop.is_accepting_queue === 1);
   const [showSettings, setShowSettings] = useState(false);
+  const wake = useWakeLock(true);
   const customerUrl = `${location.origin}/q/${shop.slug}`;
   const [copied, setCopied] = useState(false);
 
@@ -184,6 +187,9 @@ function ShopManager({ shop, onChange }: { shop: Shop; onChange: () => void }) {
       </div>
 
       {showSettings && <SettingsPanel shop={shop} onChange={onChange} />}
+      {wake && (
+        <p className="text-xs font-medium text-emerald-700">{t("pwa.wakeOn")}</p>
+      )}
 
       <div className="grid gap-6 md:grid-cols-[1fr_280px]">
         <div className="space-y-6">

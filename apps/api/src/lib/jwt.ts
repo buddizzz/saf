@@ -5,13 +5,13 @@ const TOKEN_TTL_SECONDS = 60 * 60 * 12; // 12 ساعة (مبسّط لنسخة MV
 
 export async function issueToken(
   secret: string,
-  payload: Omit<AuthPayload, "exp" | "iat"> | Omit<AdminAuthPayload, "exp" | "iat">,
+  payload:
+    | Omit<AuthPayload, "exp" | "iat">
+    | Omit<AdminAuthPayload, "exp" | "iat">,
+  ttlSeconds = TOKEN_TTL_SECONDS,
 ): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
-  return sign(
-    { ...payload, iat: now, exp: now + TOKEN_TTL_SECONDS },
-    secret,
-  );
+  return sign({ ...payload, iat: now, exp: now + ttlSeconds }, secret);
 }
 
 export async function readToken(
@@ -19,7 +19,9 @@ export async function readToken(
   token: string,
 ): Promise<(AuthPayload | AdminAuthPayload) | null> {
   try {
-    return (await verify(token, secret, "HS256")) as AuthPayload | AdminAuthPayload;
+    return (await verify(token, secret, "HS256")) as
+      | AuthPayload
+      | AdminAuthPayload;
   } catch {
     return null;
   }

@@ -31,7 +31,11 @@ export const requireAdmin = createMiddleware<{
   if (!payload || payload.role !== "admin") {
     return c.json({ error: "جلسة أدمن غير صالحة" }, 401);
   }
-  c.set("admin", payload as AdminAuthPayload);
+  const adminPayload = payload as AdminAuthPayload;
+  if (adminPayload.pending2fa) {
+    return c.json({ error: "أكمل التحقق بخطوتين" }, 401);
+  }
+  c.set("admin", adminPayload);
   await next();
 });
 

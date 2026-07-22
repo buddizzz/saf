@@ -301,4 +301,10 @@ export const en: Translations = {
     deleted: "Your data was deleted.",
     invalid: "Invalid link.",
   },
+  pwa: {
+    installTitle: "Install SAF on your home screen",
+    installBody: "Quick access and keep the screen awake while managing the queue.",
+    installCta: "Install",
+    wakeOn: "Screen stays awake while you manage the queue",
+  },
 };

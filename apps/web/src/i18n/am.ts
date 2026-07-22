@@ -301,4 +301,10 @@ export const am: Translations = {
     deleted: "ውሂብዎ ተሰርዟል።",
     invalid: "ልክ ያልሆነ አገናኝ።",
   },
+  pwa: {
+    installTitle: "SAFን በመነሻ ስክሪን ላይ ይጫኑ",
+    installBody: "ፈጣን መዳረሻ እና ወረፋ ሲያስተዳድሩ ማያ ገጹን ነቅቶ ያቆዩ።",
+    installCta: "ጫን",
+    wakeOn: "ወረፋ ሲያስተዳድሩ ማያ ገጹ ነቅቶ ይቆያል",
+  },
 };

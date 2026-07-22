@@ -1,14 +1,21 @@
 import { Hono } from "hono";
 import type { AppEnv } from "../lib/http";
 import { isValidEmail, requireFields } from "../lib/http";
-import { hashPassword, verifyPassword } from "../lib/crypto";
+import { hashPassword, needsRehash, verifyPassword } from "../lib/crypto";
 import { generateId } from "../lib/slug";
 import { issueToken } from "../lib/jwt";
 import { requireAuth } from "../middleware/auth";
+import { clientIp, rateLimit } from "../lib/rate-limit";
 
 export const authRoutes = new Hono<AppEnv>();
 
 authRoutes.post("/register", async (c) => {
+  const ip = clientIp(c);
+  const rl = rateLimit(`auth-register:${ip}`, 10, 60_000);
+  if (!rl.ok) {
+    return c.json({ error: "محاولات كثيرة", retry_after: rl.retryAfterSec }, 429);
+  }
+
   const body = await c.req.json().catch(() => ({}));
   const err = requireFields(body, ["name", "email", "password"]);
   if (err) return c.json({ error: err }, 400);
@@ -43,6 +50,12 @@ authRoutes.post("/register", async (c) => {
 });
 
 authRoutes.post("/login", async (c) => {
+  const ip = clientIp(c);
+  const rl = rateLimit(`auth-login:${ip}`, 5, 60_000, { lockMs: 60_000 });
+  if (!rl.ok) {
+    return c.json({ error: "محاولات كثيرة", retry_after: rl.retryAfterSec }, 429);
+  }
+
   const body = await c.req.json().catch(() => ({}));
   const err = requireFields(body, ["email", "password"]);
   if (err) return c.json({ error: err }, 400);
@@ -55,6 +68,13 @@ authRoutes.post("/login", async (c) => {
 
   if (!owner || !(await verifyPassword(body.password, owner.password_hash))) {
     return c.json({ error: "بيانات الدخول غير صحيحة" }, 401);
+  }
+
+  if (needsRehash(owner.password_hash)) {
+    const next = await hashPassword(body.password);
+    await c.env.DB.prepare(`UPDATE owners SET password_hash = ? WHERE id = ?`)
+      .bind(next, owner.id)
+      .run();
   }
 
   const token = await issueToken(c.env.JWT_SECRET, {

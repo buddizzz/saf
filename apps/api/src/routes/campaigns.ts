@@ -14,6 +14,7 @@ import {
   type TargetingJson,
 } from "../lib/campaigns";
 import { debitBalance, ensureShopBalance } from "../lib/billing";
+import { rateLimit } from "../lib/rate-limit";
 
 export const campaignRoutes = new Hono<AppEnv>();
 
@@ -121,6 +122,8 @@ campaignRoutes.post(
 );
 
 campaignRoutes.post("/:shopId/campaigns", requireAuth, async (c) => {
+  const rl = rateLimit(`campaign-create:${c.req.param("shopId")}`, 20, 24 * 60 * 60 * 1000);
+  if (!rl.ok) return c.json({ error: "تجاوزت الحد اليومي لإنشاء الحملات", retry_after: rl.retryAfterSec }, 429);
   const shop = await loadOwnedShop(c, c.req.param("shopId"));
   if (!shop) return c.json({ error: "غير مصرّح" }, 403);
   const proErr = await assertProShop(shop);

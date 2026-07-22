@@ -301,4 +301,10 @@ export const id: Translations = {
     deleted: "Data Anda telah dihapus.",
     invalid: "Tautan tidak valid.",
   },
+  pwa: {
+    installTitle: "Pasang SAF di layar utama",
+    installBody: "Akses cepat dan jaga layar tetap aktif saat mengelola antrean.",
+    installCta: "Pasang",
+    wakeOn: "Layar tetap aktif saat Anda mengelola antrean",
+  },
 };

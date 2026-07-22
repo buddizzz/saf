@@ -14,6 +14,7 @@ import { adminRoutes } from "./routes/admin";
 import { campaignRoutes } from "./routes/campaigns";
 import { billingRoutes } from "./routes/billing";
 import { marketingRoutes } from "./routes/marketing";
+import { whatsappWebhookRoutes } from "./routes/whatsapp-webhook";
 import { runCampaignCron } from "./cron/send-campaigns";
 
 export { ShopQueue } from "./durable-objects/ShopQueue";
@@ -34,6 +35,17 @@ app.use("*", async (c, next) => {
   return handler(c, next);
 });
 
+// HSTS في الإنتاج
+app.use("*", async (c, next) => {
+  await next();
+  if (c.env.ENVIRONMENT === "production") {
+    c.res.headers.set(
+      "Strict-Transport-Security",
+      "max-age=31536000; includeSubDomains; preload",
+    );
+  }
+});
+
 app.get("/health", (c) => c.json({ ok: true, service: "saf-api" }));
 
 app.route("/auth", authRoutes);
@@ -47,6 +59,7 @@ app.route("/queue", queueRoutes);
 app.route("/assets", assetRoutes);
 app.route("/", bookingRoutes);
 app.route("/", marketingRoutes);
+app.route("/", whatsappWebhookRoutes);
 app.route("/admin", adminRoutes);
 
 app.notFound((c) => c.json({ error: "المسار غير موجود" }, 404));

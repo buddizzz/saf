@@ -1,6 +1,7 @@
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { adminFetch } from "../lib/api";
 import { useAdminAuth } from "../lib/auth";
+import { TwoFactorSetupCard } from "./LoginPage";
 
 interface Overview {
   shops_total: number;
@@ -59,7 +60,7 @@ interface PendingCampaign {
 type Tab = "overview" | "shops" | "campaigns" | "audit";
 
 export function DashboardPage() {
-  const { admin, logout } = useAdminAuth();
+  const { admin, logout, mustEnroll2fa } = useAdminAuth();
   const [tab, setTab] = useState<Tab>("overview");
   const [overview, setOverview] = useState<Overview | null>(null);
   const [shops, setShops] = useState<ShopRow[]>([]);
@@ -229,6 +230,12 @@ export function DashboardPage() {
       {message && (
         <div className="mb-4 rounded-lg bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-800">
           {message}
+        </div>
+      )}
+
+      {mustEnroll2fa && (
+        <div className="mb-5">
+          <TwoFactorSetupCard />
         </div>
       )}
 

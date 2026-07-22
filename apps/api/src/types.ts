@@ -10,6 +10,11 @@ export interface Env {
   /** Meta WhatsApp Cloud API — اختياري محليًا (وضع stub) */
   WHATSAPP_TOKEN?: string;
   WHATSAPP_PHONE_NUMBER_ID?: string;
+  WHATSAPP_TEMPLATE_NAME?: string;
+  WHATSAPP_TEMPLATE_LANG?: string;
+  WHATSAPP_VERIFY_TOKEN?: string;
+  /** AES-256 key material for customer phone encryption */
+  PHONE_ENCRYPTION_KEY?: string;
   /** أصل واجهة الويب لروابط إلغاء الاشتراك */
   PUBLIC_WEB_ORIGIN?: string;
 }
@@ -29,6 +34,7 @@ export interface AdminAuthPayload {
   email: string;
   role: "admin";
   adminRole: AdminRole;
+  pending2fa?: boolean;
   [key: string]: unknown;
 }
 
