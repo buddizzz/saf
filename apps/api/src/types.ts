@@ -17,6 +17,11 @@ export interface Env {
   PHONE_ENCRYPTION_KEY?: string;
   /** أصل واجهة الويب لروابط إلغاء الاشتراك */
   PUBLIC_WEB_ORIGIN?: string;
+  /**
+   * فرض 2FA على لوحة الأدمن.
+   * "false" يعطّله مؤقتًا للاختبار. في الإنتاج اتركه true أو غير معرّف.
+   */
+  ADMIN_2FA_REQUIRED?: string;
 }
 
 export interface AuthPayload {

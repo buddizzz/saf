@@ -21,6 +21,14 @@ import type { AdminRole } from "../types";
 
 export const adminRoutes = new Hono<AppEnv>();
 
+/** 2FA مفعّل افتراضيًا؛ عطّله بـ ADMIN_2FA_REQUIRED=false للاختبار. */
+function isAdmin2faRequired(env: { ADMIN_2FA_REQUIRED?: string }): boolean {
+  const raw = env.ADMIN_2FA_REQUIRED?.trim().toLowerCase();
+  if (raw === "false" || raw === "0" || raw === "off") return false;
+  if (raw === "true" || raw === "1" || raw === "on") return true;
+  return true;
+}
+
 async function audit(
   db: D1Database,
   adminId: string,
@@ -84,7 +92,7 @@ adminRoutes.post("/auth/bootstrap", async (c) => {
         role: "super_admin" as AdminRole,
         totp_enabled: false,
       },
-      must_enroll_2fa: true,
+      must_enroll_2fa: isAdmin2faRequired(c.env),
     },
     201,
   );
@@ -159,8 +167,12 @@ adminRoutes.post("/auth/login", async (c) => {
       .run();
   }
 
-  // إن كان 2FA مفعّلًا: لا تُصدر JWT كامل إلا بعد الرمز
-  if (admin.totp_enabled === 1 && admin.totp_secret) {
+  // إن كان 2FA مفعّلًا ومطلوبًا: لا تُصدر JWT كامل إلا بعد الرمز
+  if (
+    isAdmin2faRequired(c.env) &&
+    admin.totp_enabled === 1 &&
+    admin.totp_secret
+  ) {
     const pending = await issueToken(
       c.env.JWT_SECRET,
       {
@@ -189,7 +201,8 @@ adminRoutes.post("/auth/login", async (c) => {
   return c.json({
     token,
     requires_2fa: false,
-    must_enroll_2fa: admin.totp_enabled !== 1,
+    must_enroll_2fa:
+      isAdmin2faRequired(c.env) && admin.totp_enabled !== 1,
     admin: {
       id: admin.id,
       email: admin.email,
@@ -254,6 +267,9 @@ adminRoutes.post("/auth/2fa/verify", async (c) => {
 });
 
 adminRoutes.post("/auth/2fa/setup", requireAdmin, async (c) => {
+  if (!isAdmin2faRequired(c.env)) {
+    return c.json({ error: "2FA معطّل مؤقتًا (ADMIN_2FA_REQUIRED=false)" }, 400);
+  }
   const auth = c.get("admin");
   const secret = generateTotpSecret();
   await c.env.DB.prepare(
@@ -306,9 +322,21 @@ adminRoutes.get("/auth/me", requireAdmin, async (c) => {
     `SELECT id, email, name, role, is_active, totp_enabled FROM admin_users WHERE id = ?`,
   )
     .bind(auth.sub)
-    .first();
+    .first<{
+      id: string;
+      email: string;
+      name: string;
+      role: AdminRole;
+      is_active: number;
+      totp_enabled: number;
+    }>();
   if (!admin) return c.json({ error: "غير موجود" }, 404);
-  return c.json({ admin });
+  const require2fa = isAdmin2faRequired(c.env);
+  return c.json({
+    admin,
+    must_enroll_2fa: require2fa && admin.totp_enabled !== 1,
+    admin_2fa_required: require2fa,
+  });
 });
 
 adminRoutes.get(

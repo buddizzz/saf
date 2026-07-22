@@ -48,10 +48,14 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
       setLoading(false);
       return;
     }
-    adminFetch<{ admin: AdminUser }>("/admin/auth/me")
+    adminFetch<{
+      admin: AdminUser;
+      must_enroll_2fa?: boolean;
+      admin_2fa_required?: boolean;
+    }>("/admin/auth/me")
       .then((res) => {
         setAdmin(res.admin);
-        setMustEnroll2fa(!(res.admin.totp_enabled === true || res.admin.totp_enabled === 1));
+        setMustEnroll2fa(Boolean(res.must_enroll_2fa));
       })
       .catch(() => setAdminToken(null))
       .finally(() => setLoading(false));
