@@ -199,10 +199,16 @@ adminRoutes.get(
     binds.push(limit);
     const { results } = await c.env.DB.prepare(
       `SELECT id, name, slug, shop_type, subscription_tier, subscription_status,
-              subscription_renews_at, is_active, suspended_at, suspend_reason, created_at
+              subscription_renews_at, is_active, suspended_at, suspend_reason, created_at,
+              country_code, city_id, district_id, lat, lng, osm_display_name, location_source
        FROM shops
        WHERE ${clauses.join(" AND ")}
-       ORDER BY created_at DESC
+       ORDER BY
+         CASE WHEN city_id IS NULL THEN 1 ELSE 0 END,
+         city_id,
+         CASE WHEN district_id IS NULL THEN 1 ELSE 0 END,
+         district_id,
+         name
        LIMIT ?`,
     )
       .bind(...binds)

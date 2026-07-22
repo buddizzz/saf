@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { apiFetch, assetUrl } from "../lib/api";
+import { readDeviceCoords } from "../lib/geo";
 import { useQueueWebSocket } from "../hooks/useQueueWebSocket";
 import { useAudioAlerts } from "../hooks/useAudioAlerts";
 import { Logo } from "../components/Logo";
@@ -266,9 +267,18 @@ function JoinForm({
     unlock();
     setBusy(true);
     try {
+      const coords = await readDeviceCoords(5000);
       const res = await apiFetch<{ queueNumber: number; sessionToken: string }>(
         "/queue/join",
-        { method: "POST", body: JSON.stringify({ slug, ...form }) },
+        {
+          method: "POST",
+          body: JSON.stringify({
+            slug,
+            ...form,
+            lat: coords?.lat ?? null,
+            lng: coords?.lng ?? null,
+          }),
+        },
       );
       onJoined(res.sessionToken, res.queueNumber);
     } catch (err) {

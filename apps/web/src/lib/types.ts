@@ -36,6 +36,14 @@ export interface Shop {
   working_hours: string | null;
   logo_url: string | null;
   tagline: string | null;
+  country_code?: string | null;
+  city_id?: string | null;
+  district_id?: string | null;
+  district_name_free?: string | null;
+  lat?: number | null;
+  lng?: number | null;
+  osm_display_name?: string | null;
+  location_source?: string | null;
 }
 
 export interface StaffMember {

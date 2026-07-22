@@ -22,6 +22,12 @@ interface ShopRow {
   suspended_at: number | null;
   suspend_reason: string | null;
   created_at: number;
+  city_id?: string | null;
+  district_id?: string | null;
+  lat?: number | null;
+  lng?: number | null;
+  osm_display_name?: string | null;
+  location_source?: string | null;
 }
 
 interface AuditEntry {
@@ -207,6 +213,16 @@ export function DashboardPage() {
                       <div className="font-mono text-xs text-ink-700/60" dir="ltr">
                         /{shop.slug}
                       </div>
+                      {shop.osm_display_name && (
+                        <div className="mt-1 max-w-[220px] truncate text-[11px] text-ink-700/50">
+                          {shop.osm_display_name}
+                        </div>
+                      )}
+                      {shop.lat != null && shop.lng != null && (
+                        <div className="font-mono text-[10px] text-ink-700/40" dir="ltr">
+                          {shop.lat.toFixed(4)}, {shop.lng.toFixed(4)}
+                        </div>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       <span

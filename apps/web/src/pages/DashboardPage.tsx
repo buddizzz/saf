@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { QRCodeSVG } from "qrcode.react";
 import { apiFetch } from "../lib/api";
+import { readDeviceCoords } from "../lib/geo";
 import { useAuth } from "../lib/auth";
 import { useQueueWebSocket } from "../hooks/useQueueWebSocket";
 import { Logo } from "../components/Logo";
@@ -358,6 +359,7 @@ function CreateShopForm({
   const [districts, setDistricts] = useState<Location[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [geoHint, setGeoHint] = useState<string | null>(null);
 
   useEffect(() => {
     apiFetch<{ cities: Location[] }>(
@@ -379,7 +381,12 @@ function CreateShopForm({
     e.preventDefault();
     setBusy(true);
     setError(null);
+    setGeoHint(t("location.locating"));
     try {
+      const coords = await readDeviceCoords();
+      setGeoHint(
+        coords ? t("location.gpsCaptured") : t("location.osmWillGeocode"),
+      );
       await apiFetch("/shops", {
         method: "POST",
         auth: true,
@@ -389,6 +396,8 @@ function CreateShopForm({
           country_code: form.country_code,
           city_id: form.city_id || null,
           district_id: form.district_id || null,
+          lat: coords?.lat ?? null,
+          lng: coords?.lng ?? null,
         }),
       });
       onCreated();
@@ -469,6 +478,8 @@ function CreateShopForm({
         </div>
       )}
       {error && <p className="text-sm font-bold text-rose-600">{error}</p>}
+      {geoHint && <p className="text-xs text-slate-500">{geoHint}</p>}
+      <p className="text-xs text-slate-400">{t("location.createHint")}</p>
       <button className="btn-primary w-full" disabled={busy}>
         {busy ? t("common.loading") : t("dashboard.create")}
       </button>

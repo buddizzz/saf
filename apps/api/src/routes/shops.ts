@@ -9,11 +9,105 @@ import {
   isPro,
   staffLimit,
 } from "../lib/subscription";
+import {
+  distanceKm,
+  geocodeAddress,
+  parseCoords,
+  reverseGeocode,
+} from "../lib/osm";
+import { listNewInArea, listPastCustomers } from "../lib/visits";
 import { requireAuth } from "../middleware/auth";
 
 export const shopRoutes = new Hono<AppEnv>();
 
 const SHOP_TYPES = ["barber", "restaurant", "clinic", "salon", "other"];
+
+async function resolveShopGeo(
+  db: D1Database,
+  input: {
+    lat?: unknown;
+    lng?: unknown;
+    country_code?: string | null;
+    city_id?: string | null;
+    district_id?: string | null;
+    district_name_free?: string | null;
+  },
+): Promise<{
+  lat: number | null;
+  lng: number | null;
+  osm_place_id: string | null;
+  osm_display_name: string | null;
+  location_source: string;
+  district_name_free: string | null;
+}> {
+  const gps = parseCoords(input.lat, input.lng);
+  const districtFree = input.district_name_free ?? null;
+
+  if (gps) {
+    const osm = await reverseGeocode(gps.lat, gps.lng);
+    return {
+      lat: gps.lat,
+      lng: gps.lng,
+      osm_place_id: osm?.place_id ?? null,
+      osm_display_name: osm?.display_name ?? null,
+      location_source: "gps",
+      district_name_free: districtFree || osm?.district_name || null,
+    };
+  }
+
+  let cityName: string | null = null;
+  let districtName: string | null = districtFree;
+  let countryName: string | null = input.country_code ?? null;
+
+  if (input.city_id) {
+    const city = await db
+      .prepare("SELECT name_ar, name_en FROM cities WHERE id = ?")
+      .bind(input.city_id)
+      .first<{ name_ar: string; name_en: string }>();
+    cityName = city?.name_ar ?? city?.name_en ?? null;
+  }
+  if (input.district_id) {
+    const district = await db
+      .prepare("SELECT name_ar, name_en FROM districts WHERE id = ?")
+      .bind(input.district_id)
+      .first<{ name_ar: string; name_en: string }>();
+    districtName = district?.name_ar ?? district?.name_en ?? districtName;
+  }
+  if (input.country_code) {
+    const country = await db
+      .prepare("SELECT name_ar, name_en FROM countries WHERE code = ?")
+      .bind(input.country_code)
+      .first<{ name_ar: string; name_en: string }>();
+    countryName = country?.name_ar ?? country?.name_en ?? input.country_code;
+  }
+
+  const osm = await geocodeAddress({
+    country: countryName,
+    city: cityName,
+    district: districtName,
+    freeDistrict: districtFree,
+  });
+
+  if (osm) {
+    return {
+      lat: osm.lat,
+      lng: osm.lng,
+      osm_place_id: osm.place_id,
+      osm_display_name: osm.display_name,
+      location_source: "osm_geocode",
+      district_name_free: districtFree || osm.district_name || null,
+    };
+  }
+
+  return {
+    lat: null,
+    lng: null,
+    osm_place_id: null,
+    osm_display_name: null,
+    location_source: "none",
+    district_name_free: districtFree,
+  };
+}
 
 // التحقق من توفّر slug مخصص (قبل مسار /:slug).
 shopRoutes.get("/slug-available", requireAuth, async (c) => {
@@ -39,6 +133,83 @@ shopRoutes.get("/slug-available", requireAuth, async (c) => {
   });
 });
 
+// محلات مرتّبة جغرافيًا (للحملات / الاستكشاف) — قبل مسار /:slug.
+shopRoutes.get("/by-location", requireAuth, async (c) => {
+  const cityId = c.req.query("city_id");
+  const districtId = c.req.query("district_id");
+  const country = c.req.query("country_code") ?? "SA";
+  const origin = parseCoords(c.req.query("lat"), c.req.query("lng"));
+  const limit = Math.min(Number(c.req.query("limit") ?? 50), 100);
+
+  const clauses = ["suspended_at IS NULL", "is_active = 1"];
+  const binds: unknown[] = [];
+  if (country) {
+    clauses.push("country_code = ?");
+    binds.push(country);
+  }
+  if (cityId) {
+    clauses.push("city_id = ?");
+    binds.push(cityId);
+  }
+  if (districtId) {
+    clauses.push("district_id = ?");
+    binds.push(districtId);
+  }
+
+  const { results } = await c.env.DB.prepare(
+    `SELECT id, name, slug, shop_type, country_code, city_id, district_id,
+            district_name_free, lat, lng, osm_display_name, location_source,
+            subscription_tier
+     FROM shops
+     WHERE ${clauses.join(" AND ")}
+     LIMIT 200`,
+  )
+    .bind(...binds)
+    .all<{
+      id: string;
+      name: string;
+      slug: string;
+      shop_type: string;
+      country_code: string;
+      city_id: string | null;
+      district_id: string | null;
+      district_name_free: string | null;
+      lat: number | null;
+      lng: number | null;
+      osm_display_name: string | null;
+      location_source: string | null;
+      subscription_tier: string;
+    }>();
+
+  let shops = results ?? [];
+  if (origin) {
+    shops = shops
+      .map((s) => ({
+        ...s,
+        distance_km:
+          s.lat != null && s.lng != null
+            ? Math.round(distanceKm(origin, { lat: s.lat, lng: s.lng }) * 100) /
+              100
+            : null,
+      }))
+      .sort((a, b) => {
+        if (a.distance_km == null && b.distance_km == null) return 0;
+        if (a.distance_km == null) return 1;
+        if (b.distance_km == null) return -1;
+        return a.distance_km - b.distance_km;
+      });
+  } else {
+    shops = shops.sort((a, b) =>
+      `${a.city_id ?? ""}${a.district_id ?? ""}${a.name}`.localeCompare(
+        `${b.city_id ?? ""}${b.district_id ?? ""}${b.name}`,
+        "ar",
+      ),
+    );
+  }
+
+  return c.json({ shops: shops.slice(0, limit), origin });
+});
+
 // إنشاء محل جديد (يبدأ دائمًا على الباقة المجانية برابط عشوائي).
 shopRoutes.post("/", requireAuth, async (c) => {
   const auth = c.get("auth");
@@ -59,11 +230,15 @@ shopRoutes.post("/", requireAuth, async (c) => {
     slug = generateSlug();
   }
 
+  const geo = await resolveShopGeo(c.env.DB, body);
+  const now = Math.floor(Date.now() / 1000);
   const id = generateId("shop");
   await c.env.DB.prepare(
     `INSERT INTO shops
-      (id, owner_id, name, slug, shop_type, country_code, city_id, district_id, district_name_free, lat, lng, working_hours)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      (id, owner_id, name, slug, shop_type, country_code, city_id, district_id,
+       district_name_free, lat, lng, working_hours,
+       osm_place_id, osm_display_name, location_source, location_updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   )
     .bind(
       id,
@@ -74,10 +249,14 @@ shopRoutes.post("/", requireAuth, async (c) => {
       body.country_code,
       body.city_id ?? null,
       body.district_id ?? null,
-      body.district_name_free ?? null,
-      body.lat ?? null,
-      body.lng ?? null,
+      geo.district_name_free,
+      geo.lat,
+      geo.lng,
       body.working_hours ? JSON.stringify(body.working_hours) : null,
+      geo.osm_place_id,
+      geo.osm_display_name,
+      geo.location_source,
+      geo.lat != null ? now : null,
     )
     .run();
 
@@ -255,6 +434,71 @@ shopRoutes.patch("/:id", requireAuth, async (c) => {
     values.push(body.hide_powered_by ? 1 : 0);
   }
 
+  // تحديث الموقع: GPS من المتصفح و/أو دولة/مدينة/حي → إثراء OSM.
+  const wantsGeo =
+    body.lat !== undefined ||
+    body.lng !== undefined ||
+    body.city_id !== undefined ||
+    body.district_id !== undefined ||
+    body.district_name_free !== undefined ||
+    body.refresh_location === true;
+
+  if (wantsGeo) {
+    const current = await c.env.DB.prepare(
+      `SELECT country_code, city_id, district_id, district_name_free, lat, lng
+       FROM shops WHERE id = ?`,
+    )
+      .bind(id)
+      .first<{
+        country_code: string | null;
+        city_id: string | null;
+        district_id: string | null;
+        district_name_free: string | null;
+        lat: number | null;
+        lng: number | null;
+      }>();
+
+    if (body.city_id !== undefined) {
+      updates.push("city_id = ?");
+      values.push(body.city_id || null);
+    }
+    if (body.district_id !== undefined) {
+      updates.push("district_id = ?");
+      values.push(body.district_id || null);
+    }
+
+    const geo = await resolveShopGeo(c.env.DB, {
+      lat: body.lat !== undefined ? body.lat : current?.lat,
+      lng: body.lng !== undefined ? body.lng : current?.lng,
+      country_code: current?.country_code,
+      city_id:
+        body.city_id !== undefined ? body.city_id || null : current?.city_id,
+      district_id:
+        body.district_id !== undefined
+          ? body.district_id || null
+          : current?.district_id,
+      district_name_free:
+        body.district_name_free !== undefined
+          ? body.district_name_free
+          : current?.district_name_free,
+    });
+
+    updates.push("lat = ?");
+    values.push(geo.lat);
+    updates.push("lng = ?");
+    values.push(geo.lng);
+    updates.push("osm_place_id = ?");
+    values.push(geo.osm_place_id);
+    updates.push("osm_display_name = ?");
+    values.push(geo.osm_display_name);
+    updates.push("location_source = ?");
+    values.push(geo.location_source);
+    updates.push("location_updated_at = ?");
+    values.push(Math.floor(Date.now() / 1000));
+    updates.push("district_name_free = ?");
+    values.push(geo.district_name_free);
+  }
+
   if (updates.length === 0) {
     return c.json({ error: "لا توجد حقول للتحديث" }, 400);
   }
@@ -366,6 +610,102 @@ async function ownsShop(
     .first();
   return !!shop;
 }
+
+// معاينة جمهور الحملة (عملاء سابقون / جدد في المنطقة) — بدون كشف أرقام للغير.
+shopRoutes.get("/:id/audience", requireAuth, async (c) => {
+  const auth = c.get("auth");
+  const shopId = c.req.param("id");
+  if (!(await ownsShop(c, auth.sub, shopId))) {
+    return c.json({ error: "غير مصرّح" }, 403);
+  }
+
+  const type = c.req.query("type") ?? "past_customers";
+  const filters = {
+    cityId: c.req.query("city_id"),
+    districtId: c.req.query("district_id"),
+    gender: c.req.query("gender"),
+    ageCategory: c.req.query("age_category"),
+    excludeShopId: shopId,
+    limit: Number(c.req.query("limit") ?? 50),
+  };
+
+  if (type === "new_in_area") {
+    if (!filters.cityId && !filters.districtId) {
+      const shop = await c.env.DB.prepare(
+        "SELECT city_id, district_id FROM shops WHERE id = ?",
+      )
+        .bind(shopId)
+        .first<{ city_id: string | null; district_id: string | null }>();
+      filters.cityId = shop?.city_id ?? undefined;
+      filters.districtId = shop?.district_id ?? undefined;
+    }
+    const customers = await listNewInArea(c.env.DB, filters);
+    return c.json({
+      type,
+      count: customers.length,
+      // لا نُرجع أرقام الجوال للمالك — المنصة ترسل نيابةً عنه لاحقًا.
+      customers: customers.map((row) => ({
+        name: row.name,
+        gender: row.gender,
+        age_category: row.age_category,
+        last_city_id: row.last_city_id,
+        last_district_id: row.last_district_id,
+        last_visit_at: row.last_visit_at,
+      })),
+    });
+  }
+
+  const customers = await listPastCustomers(c.env.DB, shopId, filters);
+  return c.json({
+    type: "past_customers",
+    count: customers.length,
+    customers: customers.map((row) => ({
+      name: row.name,
+      gender: row.gender,
+      age_category: row.age_category,
+      visit_count: row.visit_count,
+      last_visit_at: row.last_visit_at,
+      last_city_id: row.last_city_id,
+      last_district_id: row.last_district_id,
+    })),
+  });
+});
+
+// سجل زيارات المحل (ملخص للحملات).
+shopRoutes.get("/:id/visits", requireAuth, async (c) => {
+  const auth = c.get("auth");
+  const shopId = c.req.param("id");
+  if (!(await ownsShop(c, auth.sub, shopId))) {
+    return c.json({ error: "غير مصرّح" }, 403);
+  }
+
+  const summary = await c.env.DB.prepare(
+    `SELECT
+       COUNT(*) AS unique_visitors,
+       COALESCE(SUM(visit_count), 0) AS total_visits,
+       SUM(CASE WHEN c.marketing_consent = 1 THEN 1 ELSE 0 END) AS marketing_opted_in
+     FROM customer_shop_visits v
+     JOIN customers c ON c.phone = v.phone
+     WHERE v.shop_id = ?`,
+  )
+    .bind(shopId)
+    .first();
+
+  const byAge = await c.env.DB.prepare(
+    `SELECT COALESCE(c.age_category, 'unknown') AS age_category, COUNT(*) AS n
+     FROM customer_shop_visits v
+     JOIN customers c ON c.phone = v.phone
+     WHERE v.shop_id = ?
+     GROUP BY COALESCE(c.age_category, 'unknown')`,
+  )
+    .bind(shopId)
+    .all();
+
+  return c.json({
+    summary,
+    by_age: byAge.results ?? [],
+  });
+});
 
 // قائمة موظفي المحل (المالك فقط).
 shopRoutes.get("/:id/staff", requireAuth, async (c) => {

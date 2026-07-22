@@ -48,7 +48,9 @@ queueRoutes.post("/join", async (c) => {
   }
 
   const shop = await c.env.DB.prepare(
-    "SELECT id, is_active, is_accepting_queue, working_hours FROM shops WHERE slug = ?",
+    `SELECT id, is_active, is_accepting_queue, working_hours,
+            country_code, city_id, district_id, lat, lng
+     FROM shops WHERE slug = ?`,
   )
     .bind(body.slug)
     .first<{
@@ -65,6 +67,11 @@ queueRoutes.post("/join", async (c) => {
     return c.json({ error: "المحل مغلق حاليًا خارج ساعات العمل" }, 409);
   }
 
+  const customerLat =
+    typeof body.lat === "number" && Number.isFinite(body.lat) ? body.lat : null;
+  const customerLng =
+    typeof body.lng === "number" && Number.isFinite(body.lng) ? body.lng : null;
+
   const entry = await joinQueue(c.env.DB, shop.id, {
     name: body.name,
     phone: body.phone,
@@ -72,6 +79,8 @@ queueRoutes.post("/join", async (c) => {
     ageCategory: body.age_category ?? null,
     consent: true,
     marketingConsent: body.marketing_consent === true,
+    lat: customerLat,
+    lng: customerLng,
   });
 
   await stubFor(c, shop.id).broadcast(shop.id);

@@ -1,5 +1,6 @@
 import type { QueueEntry, QueueSnapshot } from "../types";
 import { generateId, generateSlug } from "./slug";
+import { recordCustomerVisit } from "./visits";
 
 // تاريخ اليوم بتوقيت السعودية (Asia/Riyadh) لإعادة الترقيم اليومي.
 export function todayInRiyadh(): string {
@@ -64,6 +65,8 @@ export interface JoinInput {
   ageCategory?: string | null;
   consent: boolean;
   marketingConsent?: boolean;
+  lat?: number | null;
+  lng?: number | null;
 }
 
 export async function joinQueue(
@@ -74,27 +77,35 @@ export async function joinQueue(
   const queueDate = todayInRiyadh();
   const now = Math.floor(Date.now() / 1000);
 
-  // upsert للعميل الموحّد. موافقة التسويق ترتفع فقط (opt-in) ولا تُخفَّض تلقائيًا.
-  await db
+  const shop = await db
     .prepare(
-      `INSERT INTO customers (phone, name, gender, age_category, marketing_consent, last_visit_at)
-       VALUES (?, ?, ?, ?, ?, ?)
-       ON CONFLICT(phone) DO UPDATE SET
-         name = excluded.name,
-         gender = excluded.gender,
-         age_category = excluded.age_category,
-         marketing_consent = CASE WHEN excluded.marketing_consent = 1 THEN 1 ELSE customers.marketing_consent END,
-         last_visit_at = excluded.last_visit_at`,
+      `SELECT id, country_code, city_id, district_id, lat, lng
+       FROM shops WHERE id = ?`,
     )
-    .bind(
-      input.phone,
-      input.name,
-      input.gender ?? null,
-      input.ageCategory ?? null,
-      input.marketingConsent ? 1 : 0,
-      now,
-    )
-    .run();
+    .bind(shopId)
+    .first<{
+      id: string;
+      country_code: string | null;
+      city_id: string | null;
+      district_id: string | null;
+      lat: number | null;
+      lng: number | null;
+    }>();
+
+  if (!shop) {
+    throw new Error("shop_not_found");
+  }
+
+  // عميل موحّد + سجل زيارة المحل + نسخ موقع المحل للاستهداف الجغرافي.
+  await recordCustomerVisit(db, shop, {
+    phone: input.phone,
+    name: input.name,
+    gender: input.gender,
+    ageCategory: input.ageCategory,
+    marketingConsent: input.marketingConsent,
+    lat: input.lat,
+    lng: input.lng,
+  });
 
   const maxRow = await db
     .prepare(

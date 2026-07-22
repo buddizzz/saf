@@ -5,6 +5,7 @@ import { THEMES } from "../themes";
 import { BrandIdentitySection } from "./BrandIdentitySection";
 import { SubscriptionSection } from "./SubscriptionSection";
 import { BookingSettingsSection } from "./BookingSettingsSection";
+import { LocationAudienceSection } from "./LocationAudienceSection";
 import type { Shop, StaffMember, WorkingHours } from "../lib/types";
 
 const DAYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const;
@@ -22,6 +23,7 @@ export function SettingsPanel({
   return (
     <div className="space-y-6">
       <SubscriptionSection shop={shop} onChange={onChange} />
+      <LocationAudienceSection shop={shop} onChange={onChange} />
       <BrandIdentitySection shop={shop} onChange={onChange} />
       <ThemeSection shop={shop} isPro={isPro} onChange={onChange} />
       <WorkingHoursSection shop={shop} onChange={onChange} />

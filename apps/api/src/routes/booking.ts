@@ -3,6 +3,7 @@ import type { AppEnv } from "../lib/http";
 import { isValidSaudiPhone, requireFields } from "../lib/http";
 import { randomToken } from "../lib/crypto";
 import { generateId } from "../lib/slug";
+import { recordCustomerVisit } from "../lib/visits";
 import {
   addDaysUTC,
   buildSlotsForDay,
@@ -31,6 +32,11 @@ type ShopGate = {
   theme_custom: string | null;
   logo_url: string | null;
   tagline: string | null;
+  country_code: string | null;
+  city_id: string | null;
+  district_id: string | null;
+  lat: number | null;
+  lng: number | null;
 };
 
 async function shopById(db: D1Database, id: string): Promise<ShopGate | null> {
@@ -38,7 +44,8 @@ async function shopById(db: D1Database, id: string): Promise<ShopGate | null> {
     .prepare(
       `SELECT id, owner_id, name, slug, subscription_tier, subscription_status,
               subscription_renews_at, is_active, suspended_at,
-              theme_id, theme_custom, logo_url, tagline
+              theme_id, theme_custom, logo_url, tagline,
+              country_code, city_id, district_id, lat, lng
        FROM shops WHERE id = ?`,
     )
     .bind(id)
@@ -53,7 +60,8 @@ async function shopBySlug(
     .prepare(
       `SELECT id, owner_id, name, slug, subscription_tier, subscription_status,
               subscription_renews_at, is_active, suspended_at,
-              theme_id, theme_custom, logo_url, tagline
+              theme_id, theme_custom, logo_url, tagline,
+              country_code, city_id, district_id, lat, lng
        FROM shops WHERE slug = ?`,
     )
     .bind(slug)
@@ -303,15 +311,13 @@ bookingRoutes.post("/appointments", async (c) => {
     return c.json({ error: "هذا الموعد لم يعد متاحًا" }, 409);
   }
 
-  await c.env.DB.prepare(
-    `INSERT INTO customers (phone, name, last_visit_at)
-     VALUES (?, ?, unixepoch())
-     ON CONFLICT(phone) DO UPDATE SET
-       name = excluded.name,
-       last_visit_at = excluded.last_visit_at`,
-  )
-    .bind(body.phone, body.customer_name)
-    .run();
+  await recordCustomerVisit(c.env.DB, shop, {
+    phone: body.phone,
+    name: body.customer_name,
+    marketingConsent: body.marketing_consent === true,
+    lat: typeof body.lat === "number" ? body.lat : null,
+    lng: typeof body.lng === "number" ? body.lng : null,
+  });
 
   const id = generateId("appt");
   const cancelToken = randomToken(24);

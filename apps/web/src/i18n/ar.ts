@@ -216,6 +216,36 @@ export const ar = {
     unavailable: "الحجز غير متاح لهذا المحل",
     liveQueue: "الطابور المباشر",
   },
+  location: {
+    title: "الموقع وجمهور الحملات",
+    subtitle:
+      "نحفظ زيارات العملاء وموقع المحل (GPS + OpenStreetMap) لاستهداف واتساب لاحقًا.",
+    coords: "الإحداثيات",
+    osm: "عنوان OpenStreetMap",
+    refreshGps: "تحديث الموقع من GPS / OSM",
+    locating: "جارٍ تحديد الموقع…",
+    gpsSaved: "تم حفظ موقع GPS وإثراؤه من OpenStreetMap",
+    osmFallback: "لم يُمنح إذن GPS — تم التعرّف عبر المدينة/الحي على OSM",
+    gpsCaptured: "تم التقاط GPS من جهازك",
+    osmWillGeocode: "بدون GPS — سنحدد الموقع عبر OpenStreetMap من المدينة/الحي",
+    createHint:
+      "سيُطلب إذن الموقع عند الإنشاء (اختياري). المدينة/الحي كافية إن رُفض الإذن.",
+    visitsTitle: "زيارات العملاء (لحملات واتساب)",
+    uniqueVisitors: "زائر فريد",
+    totalVisits: "إجمالي الزيارات",
+    marketingOptIn: "موافقة تسويق",
+    previewPast: "معاينة عملاء سابقين",
+    previewArea: "معاينة عملاء المنطقة",
+    privacyNote:
+      "لا تُعرض أرقام الجوال للمالك — المنصة ترسل الحملات نيابةً عنه.",
+    noAudience: "لا يوجد جمهور مطابق بعد",
+    source: {
+      gps: "من GPS الجهاز",
+      osm_geocode: "من OpenStreetMap",
+      manual: "يدوي",
+      none: "غير محدد",
+    },
+  },
 };
 
 export type Translations = typeof ar;

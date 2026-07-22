@@ -220,4 +220,34 @@ export const en: Translations = {
     unavailable: "Booking is not available for this shop",
     liveQueue: "Live queue",
   },
+  location: {
+    title: "Location & campaign audience",
+    subtitle:
+      "We store customer visits and shop location (GPS + OpenStreetMap) for future WhatsApp targeting.",
+    coords: "Coordinates",
+    osm: "OpenStreetMap place",
+    refreshGps: "Refresh location via GPS / OSM",
+    locating: "Locating…",
+    gpsSaved: "GPS saved and enriched via OpenStreetMap",
+    osmFallback: "GPS denied — resolved via city/district on OSM",
+    gpsCaptured: "GPS captured from your device",
+    osmWillGeocode: "No GPS — we will geocode city/district via OpenStreetMap",
+    createHint:
+      "Location permission is optional on create. City/district alone is enough if denied.",
+    visitsTitle: "Customer visits (for WhatsApp campaigns)",
+    uniqueVisitors: "Unique visitors",
+    totalVisits: "Total visits",
+    marketingOptIn: "Marketing opt-in",
+    previewPast: "Preview past customers",
+    previewArea: "Preview area customers",
+    privacyNote:
+      "Phone numbers are never shown to shop owners — the platform sends campaigns on their behalf.",
+    noAudience: "No matching audience yet",
+    source: {
+      gps: "Device GPS",
+      osm_geocode: "OpenStreetMap",
+      manual: "Manual",
+      none: "Not set",
+    },
+  },
 };
