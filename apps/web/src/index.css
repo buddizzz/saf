@@ -18,17 +18,19 @@ body {
 
 @layer components {
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3 font-bold transition
-      focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50;
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3 font-bold transition-all duration-200
+      focus:outline-none focus:ring-2 focus:ring-offset-2 active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100;
   }
   .btn-primary {
-    @apply btn bg-brand-600 text-white hover:bg-brand-700 focus:ring-brand-500;
+    @apply btn bg-brand-600 text-white shadow-[0_8px_20px_-6px_theme(colors.brand.600/60%)]
+      hover:-translate-y-0.5 hover:bg-brand-700 hover:shadow-[0_12px_24px_-6px_theme(colors.brand.600/70%)] focus:ring-brand-500;
   }
   .btn-gold {
-    @apply btn bg-gold-400 text-brand-900 hover:bg-gold-500 focus:ring-gold-400;
+    @apply btn bg-gradient-to-br from-gold-400 to-gold-500 text-brand-900 shadow-[0_8px_20px_-6px_theme(colors.gold.500/60%)]
+      hover:-translate-y-0.5 hover:shadow-[0_12px_24px_-6px_theme(colors.gold.500/70%)] focus:ring-gold-400;
   }
   .btn-ghost {
-    @apply btn border border-brand-200 bg-white text-brand-700 hover:bg-brand-50;
+    @apply btn border border-brand-200 bg-white text-brand-700 hover:border-brand-300 hover:bg-brand-50 focus:ring-brand-200;
   }
   .btn-danger {
     @apply btn bg-rose-500 text-white hover:bg-rose-600 focus:ring-rose-400;
@@ -41,6 +43,6 @@ body {
     @apply mb-1.5 block text-sm font-bold text-brand-800;
   }
   .card {
-    @apply rounded-2xl border border-slate-100 bg-white p-6 shadow-soft;
+    @apply rounded-2xl border border-slate-100 bg-white p-6 shadow-soft transition-shadow;
   }
 }

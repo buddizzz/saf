@@ -35,6 +35,21 @@ export default {
       },
       boxShadow: {
         soft: "0 10px 40px -12px rgba(26, 69, 81, 0.25)",
+        glow: "0 0 0 4px var(--saf-accent, rgba(224, 162, 78, 0.4)), 0 20px 45px -15px rgba(26, 69, 81, 0.35)",
+      },
+      keyframes: {
+        "fade-in": {
+          "0%": { opacity: 0, transform: "translateY(6px)" },
+          "100%": { opacity: 1, transform: "translateY(0)" },
+        },
+        "scale-in": {
+          "0%": { opacity: 0, transform: "scale(0.95)" },
+          "100%": { opacity: 1, transform: "scale(1)" },
+        },
+      },
+      animation: {
+        "fade-in": "fade-in 0.5s ease-out both",
+        "scale-in": "scale-in 0.35s ease-out both",
       },
     },
   },
