@@ -3,6 +3,8 @@ import { useTranslation } from "react-i18next";
 import { apiFetch } from "../lib/api";
 import { THEMES } from "../themes";
 import { BrandIdentitySection } from "./BrandIdentitySection";
+import { SubscriptionSection } from "./SubscriptionSection";
+import { BookingSettingsSection } from "./BookingSettingsSection";
 import type { Shop, StaffMember, WorkingHours } from "../lib/types";
 
 const DAYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const;
@@ -19,10 +21,12 @@ export function SettingsPanel({
 
   return (
     <div className="space-y-6">
+      <SubscriptionSection shop={shop} onChange={onChange} />
       <BrandIdentitySection shop={shop} onChange={onChange} />
       <ThemeSection shop={shop} isPro={isPro} onChange={onChange} />
       <WorkingHoursSection shop={shop} onChange={onChange} />
-      <StaffSection shop={shop} />
+      <BookingSettingsSection shop={shop} />
+      <StaffSection shop={shop} isPro={isPro} />
     </div>
   );
 }
@@ -192,12 +196,13 @@ function WorkingHoursSection({
   );
 }
 
-function StaffSection({ shop }: { shop: Shop }) {
+function StaffSection({ shop, isPro }: { shop: Shop; isPro: boolean }) {
   const { t } = useTranslation();
   const [staff, setStaff] = useState<StaffMember[]>([]);
   const [form, setForm] = useState({ name: "", pin: "" });
   const [error, setError] = useState<string | null>(null);
   const staffUrl = `${location.origin}/staff/${shop.slug}`;
+  const limit = isPro ? 10 : 1;
 
   const load = useCallback(async () => {
     const res = await apiFetch<{ staff: StaffMember[] }>(
@@ -237,7 +242,10 @@ function StaffSection({ shop }: { shop: Shop }) {
 
   return (
     <div className="card">
-      <h3 className="mb-3 font-extrabold text-brand-800">{t("settings.staff")}</h3>
+      <h3 className="mb-1 font-extrabold text-brand-800">{t("settings.staff")}</h3>
+      <p className="mb-3 text-xs text-slate-400">
+        {t("settings.staffLimit", { count: staff.length, limit })}
+      </p>
       {staff.length > 0 && (
         <ul className="mb-4 divide-y divide-slate-100">
           {staff.map((member) => (
@@ -275,7 +283,9 @@ function StaffSection({ shop }: { shop: Shop }) {
             required
           />
         </div>
-        <button className="btn-primary">{t("settings.addStaff")}</button>
+        <button className="btn-primary" disabled={staff.length >= limit}>
+          {t("settings.addStaff")}
+        </button>
       </form>
       {error && <p className="mt-2 text-sm font-bold text-rose-600">{error}</p>}
       <div className="mt-4 text-sm">

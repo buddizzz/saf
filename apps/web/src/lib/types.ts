@@ -27,6 +27,9 @@ export interface Shop {
   is_accepting_queue: number;
   is_active: number;
   subscription_tier: string;
+  subscription_status?: string;
+  subscription_renews_at?: number | null;
+  hide_powered_by?: number;
   avg_service_seconds: number;
   theme_id: string;
   theme_custom: string | null;
@@ -59,5 +62,7 @@ export interface PublicShop {
   isOpen: boolean;
   closedReason: string | null;
   subscription_tier: string;
+  hide_powered_by?: number;
+  booking_enabled?: boolean;
   avg_service_seconds: number;
 }

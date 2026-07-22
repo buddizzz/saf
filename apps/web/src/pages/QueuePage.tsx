@@ -109,6 +109,11 @@ export function QueuePage() {
         )}
 
         {shop.subscription_tier === "free" && <AdBanner theme={theme} />}
+        {!(shop.hide_powered_by === 1) && (
+          <p className="mt-4 text-center text-[11px] text-slate-400">
+            Powered by صفّ
+          </p>
+        )}
       </div>
     </div>
   );
@@ -758,13 +763,13 @@ function RatingCard({
 function AdBanner({ theme }: { theme: Theme }) {
   return (
     <a
-      href="#"
+      href="/login"
       className="mt-auto flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-center text-sm font-bold text-white transition-transform hover:-translate-y-0.5"
       style={{
         background: `linear-gradient(to left, ${theme.primaryDark}, ${theme.primary})`,
       }}
     >
-      رقِّ محلك لباقة Pro — بدون إعلانات + حجز عن بُعد ✨
+      رقِّ محلك لباقة Pro — بدون إعلانات + حجز عن بُعد
     </a>
   );
 }

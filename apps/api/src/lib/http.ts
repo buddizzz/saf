@@ -1,9 +1,9 @@
 import type { Hono } from "hono";
-import type { Env, AuthPayload } from "../types";
+import type { Env, AuthPayload, AdminAuthPayload } from "../types";
 
 export type AppEnv = {
   Bindings: Env;
-  Variables: { auth: AuthPayload };
+  Variables: { auth: AuthPayload; admin: AdminAuthPayload };
 };
 
 export type App = Hono<AppEnv>;

@@ -1,11 +1,11 @@
 import { sign, verify } from "hono/jwt";
-import type { AuthPayload } from "../types";
+import type { AuthPayload, AdminAuthPayload } from "../types";
 
 const TOKEN_TTL_SECONDS = 60 * 60 * 12; // 12 ساعة (مبسّط لنسخة MVP)
 
 export async function issueToken(
   secret: string,
-  payload: Omit<AuthPayload, "exp" | "iat">,
+  payload: Omit<AuthPayload, "exp" | "iat"> | Omit<AdminAuthPayload, "exp" | "iat">,
 ): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
   return sign(
@@ -17,9 +17,9 @@ export async function issueToken(
 export async function readToken(
   secret: string,
   token: string,
-): Promise<AuthPayload | null> {
+): Promise<(AuthPayload | AdminAuthPayload) | null> {
   try {
-    return (await verify(token, secret, "HS256")) as AuthPayload;
+    return (await verify(token, secret, "HS256")) as AuthPayload | AdminAuthPayload;
   } catch {
     return null;
   }
