@@ -21,3 +21,8 @@ class_name = "ShopQueue"
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["ShopQueue"]
+
+# مخزن أصول الهوية التجارية (شعارات المحلات).
+[[r2_buckets]]
+binding = "BRAND_ASSETS"
+bucket_name = "saf-brand-assets"

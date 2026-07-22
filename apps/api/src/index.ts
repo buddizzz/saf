@@ -6,6 +6,7 @@ import { shopRoutes } from "./routes/shops";
 import { locationRoutes } from "./routes/locations";
 import { queueRoutes } from "./routes/queue";
 import { staffRoutes } from "./routes/staff";
+import { assetRoutes } from "./routes/assets";
 
 export { ShopQueue } from "./durable-objects/ShopQueue";
 
@@ -32,6 +33,7 @@ app.route("/staff", staffRoutes);
 app.route("/shops", shopRoutes);
 app.route("/locations", locationRoutes);
 app.route("/queue", queueRoutes);
+app.route("/assets", assetRoutes);
 
 app.notFound((c) => c.json({ error: "المسار غير موجود" }, 404));
 app.onError((err, c) => {

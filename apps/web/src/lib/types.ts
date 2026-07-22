@@ -32,6 +32,7 @@ export interface Shop {
   theme_custom: string | null;
   working_hours: string | null;
   logo_url: string | null;
+  tagline: string | null;
 }
 
 export interface StaffMember {
@@ -54,6 +55,7 @@ export interface PublicShop {
   theme_id: string;
   theme_custom: string | null;
   logo_url: string | null;
+  tagline: string | null;
   isOpen: boolean;
   closedReason: string | null;
   subscription_tier: string;

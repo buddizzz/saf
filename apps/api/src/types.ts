@@ -3,6 +3,7 @@ import type { ShopQueue } from "./durable-objects/ShopQueue";
 export interface Env {
   DB: D1Database;
   SHOP_QUEUE: DurableObjectNamespace<ShopQueue>;
+  BRAND_ASSETS: R2Bucket;
   JWT_SECRET: string;
   ENVIRONMENT: string;
   ALLOWED_ORIGINS: string;

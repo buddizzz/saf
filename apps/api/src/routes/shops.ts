@@ -73,7 +73,7 @@ shopRoutes.get("/", requireAuth, async (c) => {
 shopRoutes.get("/:slug", async (c) => {
   const slug = c.req.param("slug");
   const shop = await c.env.DB.prepare(
-    `SELECT id, name, slug, shop_type, theme_id, theme_custom, logo_url,
+    `SELECT id, name, slug, shop_type, theme_id, theme_custom, logo_url, tagline,
             is_active, is_accepting_queue, working_hours, subscription_tier, avg_service_seconds
      FROM shops WHERE slug = ?`,
   )
@@ -133,6 +133,30 @@ shopRoutes.patch("/:id", requireAuth, async (c) => {
     updates.push("working_hours = ?");
     values.push(body.working_hours ? JSON.stringify(body.working_hours) : null);
   }
+  if (body.theme_custom !== undefined) {
+    if (body.theme_custom === null) {
+      updates.push("theme_custom = ?");
+      values.push(null);
+    } else if (
+      typeof body.theme_custom === "object" &&
+      Object.values(body.theme_custom).every(
+        (v) => typeof v === "string" && /^#[0-9a-fA-F]{3,8}$/.test(v),
+      )
+    ) {
+      updates.push("theme_custom = ?");
+      values.push(JSON.stringify(body.theme_custom));
+    } else {
+      return c.json({ error: "ألوان الهوية التجارية غير صالحة" }, 400);
+    }
+  }
+  if (body.tagline !== undefined) {
+    const tagline = typeof body.tagline === "string" ? body.tagline.trim() : "";
+    if (tagline.length > 80) {
+      return c.json({ error: "الشعار النصي طويل جدًا (80 حرفًا كحد أقصى)" }, 400);
+    }
+    updates.push("tagline = ?");
+    values.push(tagline || null);
+  }
 
   if (updates.length === 0) {
     return c.json({ error: "لا توجد حقول للتحديث" }, 400);
@@ -141,6 +165,90 @@ shopRoutes.patch("/:id", requireAuth, async (c) => {
   values.push(id);
   await c.env.DB.prepare(`UPDATE shops SET ${updates.join(", ")} WHERE id = ?`)
     .bind(...values)
+    .run();
+
+  const updated = await c.env.DB.prepare("SELECT * FROM shops WHERE id = ?")
+    .bind(id)
+    .first();
+  return c.json({ shop: updated });
+});
+
+const LOGO_MAX_BYTES = 2 * 1024 * 1024; // 2MB
+const LOGO_TYPES: Record<string, string> = {
+  "image/png": "png",
+  "image/jpeg": "jpg",
+  "image/webp": "webp",
+  "image/svg+xml": "svg",
+};
+
+// رفع شعار المحل (الهوية التجارية) — يخزَّن في R2 ويُقدَّم عبر /assets/:key.
+shopRoutes.post("/:id/logo", requireAuth, async (c) => {
+  const auth = c.get("auth");
+  const id = c.req.param("id");
+  const shop = await c.env.DB.prepare(
+    "SELECT id, logo_url FROM shops WHERE id = ? AND owner_id = ?",
+  )
+    .bind(id, auth.sub)
+    .first<{ id: string; logo_url: string | null }>();
+  if (!shop) return c.json({ error: "المحل غير موجود" }, 404);
+
+  const form = await c.req.formData().catch(() => null);
+  const entry = form?.get("file");
+  if (!entry || typeof entry === "string") {
+    return c.json({ error: "لم يتم إرفاق ملف" }, 400);
+  }
+  const file = entry as File;
+  const ext = LOGO_TYPES[file.type];
+  if (!ext) {
+    return c.json({ error: "صيغة الصورة غير مدعومة (PNG/JPG/WEBP/SVG)" }, 400);
+  }
+  if (file.size > LOGO_MAX_BYTES) {
+    return c.json({ error: "حجم الصورة يجب أن يكون أقل من 2 ميغابايت" }, 400);
+  }
+
+  const key = `logo-${id}-${Date.now()}.${ext}`;
+  await c.env.BRAND_ASSETS.put(key, await file.arrayBuffer(), {
+    httpMetadata: { contentType: file.type },
+  });
+
+  const previousKey = shop.logo_url?.startsWith("/assets/")
+    ? shop.logo_url.slice("/assets/".length)
+    : null;
+
+  await c.env.DB.prepare("UPDATE shops SET logo_url = ? WHERE id = ?")
+    .bind(`/assets/${key}`, id)
+    .run();
+
+  if (previousKey) {
+    await c.env.BRAND_ASSETS.delete(previousKey).catch(() => undefined);
+  }
+
+  const updated = await c.env.DB.prepare("SELECT * FROM shops WHERE id = ?")
+    .bind(id)
+    .first();
+  return c.json({ shop: updated });
+});
+
+// حذف شعار المحل والرجوع للحرف الأول كعلامة افتراضية.
+shopRoutes.delete("/:id/logo", requireAuth, async (c) => {
+  const auth = c.get("auth");
+  const id = c.req.param("id");
+  const shop = await c.env.DB.prepare(
+    "SELECT id, logo_url FROM shops WHERE id = ? AND owner_id = ?",
+  )
+    .bind(id, auth.sub)
+    .first<{ id: string; logo_url: string | null }>();
+  if (!shop) return c.json({ error: "المحل غير موجود" }, 404);
+
+  const previousKey = shop.logo_url?.startsWith("/assets/")
+    ? shop.logo_url.slice("/assets/".length)
+    : null;
+  if (previousKey) {
+    await c.env.BRAND_ASSETS.delete(previousKey).catch(() => undefined);
+  }
+
+  await c.env.DB.prepare("UPDATE shops SET logo_url = NULL WHERE id = ?")
+    .bind(id)
     .run();
 
   const updated = await c.env.DB.prepare("SELECT * FROM shops WHERE id = ?")

@@ -69,6 +69,20 @@ export function getTheme(id: string | null | undefined): Theme {
   return THEMES.find((t) => t.id === id) ?? THEMES[0];
 }
 
+// يدمج القالب المختار مع تخصيص المالك للهوية التجارية (theme_custom) إن وُجد.
+export function resolveShopTheme(shop: {
+  theme_id: string;
+  theme_custom: string | null;
+}): Theme {
+  const base = getTheme(shop.theme_id);
+  if (!shop.theme_custom) return base;
+  try {
+    return { ...base, ...(JSON.parse(shop.theme_custom) as Partial<Theme>) };
+  } catch {
+    return base;
+  }
+}
+
 // يحوّل القالب إلى متغيّرات CSS تُطبَّق على عنصر الغلاف.
 export function themeVars(theme: Theme): Record<string, string> {
   return {

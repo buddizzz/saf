@@ -13,10 +13,18 @@ staffRoutes.post("/login", async (c) => {
   if (err) return c.json({ error: err }, 400);
 
   const shop = await c.env.DB.prepare(
-    "SELECT id, name FROM shops WHERE slug = ? AND is_active = 1",
+    `SELECT id, name, theme_id, theme_custom, logo_url, tagline
+     FROM shops WHERE slug = ? AND is_active = 1`,
   )
     .bind(body.slug)
-    .first<{ id: string; name: string }>();
+    .first<{
+      id: string;
+      name: string;
+      theme_id: string;
+      theme_custom: string | null;
+      logo_url: string | null;
+      tagline: string | null;
+    }>();
   if (!shop) return c.json({ error: "المحل غير موجود" }, 404);
 
   const { results } = await c.env.DB.prepare(
@@ -36,7 +44,15 @@ staffRoutes.post("/login", async (c) => {
       return c.json({
         token,
         staff: { id: member.id, name: member.name },
-        shop: { id: shop.id, name: shop.name, slug: body.slug },
+        shop: {
+          id: shop.id,
+          name: shop.name,
+          slug: body.slug,
+          theme_id: shop.theme_id,
+          theme_custom: shop.theme_custom,
+          logo_url: shop.logo_url,
+          tagline: shop.tagline,
+        },
       });
     }
   }

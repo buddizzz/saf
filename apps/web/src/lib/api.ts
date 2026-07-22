@@ -45,6 +45,35 @@ export async function apiFetch<T>(
   return data as T;
 }
 
+// رفع ملف (مثل شعار المحل) عبر multipart/form-data — بدون تحديد Content-Type
+// حتى يضبطه المتصفح تلقائيًا مع boundary الصحيح.
+export async function apiUpload<T>(path: string, file: File): Promise<T> {
+  const form = new FormData();
+  form.set("file", file);
+  const token = getToken();
+  const res = await fetch(`${BASE}${path}`, {
+    method: "POST",
+    body: form,
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+  });
+  const isJson = res.headers.get("content-type")?.includes("application/json");
+  const data = isJson ? await res.json() : null;
+  if (!res.ok) {
+    const message =
+      (data && (data.error as string)) || `خطأ في الطلب (${res.status})`;
+    throw new ApiError(message, res.status);
+  }
+  return data as T;
+}
+
+// يحوّل مسار أصل نسبي (مثل شعار محل قادم من /assets/...) إلى رابط كامل
+// يمرّ عبر نفس بروكسي /api المستخدم لبقية الطلبات.
+export function assetUrl(path: string | null | undefined): string | null {
+  if (!path) return null;
+  if (/^https?:\/\//.test(path)) return path;
+  return `${BASE}${path}`;
+}
+
 // عنوان الـ WebSocket للطابور (يمرّ عبر بروكسي Vite في التطوير).
 export function queueWsUrl(shopId: string): string {
   const proto = location.protocol === "https:" ? "wss" : "ws";
