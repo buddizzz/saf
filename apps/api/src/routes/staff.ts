@@ -1,0 +1,67 @@
+import { Hono } from "hono";
+import type { AppEnv } from "../lib/http";
+import { requireFields } from "../lib/http";
+import { verifyPassword } from "../lib/crypto";
+import { issueToken } from "../lib/jwt";
+import { clientIp, rateLimit } from "../lib/rate-limit";
+
+export const staffRoutes = new Hono<AppEnv>();
+
+staffRoutes.post("/login", async (c) => {
+  const ip = clientIp(c);
+  const rl = rateLimit(`staff-login:${ip}`, 5, 60_000, { lockMs: 60_000 });
+  if (!rl.ok) {
+    return c.json({ error: "محاولات كثيرة", retry_after: rl.retryAfterSec }, 429);
+  }
+
+  const body = await c.req.json().catch(() => ({}));
+  const err = requireFields(body, ["slug", "pin"]);
+  if (err) return c.json({ error: err }, 400);
+
+  const shop = await c.env.DB.prepare(
+    `SELECT id, name, theme_id, theme_custom, logo_url, tagline
+     FROM shops WHERE slug = ? AND is_active = 1`,
+  )
+    .bind(body.slug)
+    .first<{
+      id: string;
+      name: string;
+      theme_id: string;
+      theme_custom: string | null;
+      logo_url: string | null;
+      tagline: string | null;
+    }>();
+  if (!shop) return c.json({ error: "المحل غير موجود" }, 404);
+
+  const { results } = await c.env.DB.prepare(
+    "SELECT id, name, pin_code_hash FROM staff WHERE shop_id = ? AND is_active = 1",
+  )
+    .bind(shop.id)
+    .all<{ id: string; name: string; pin_code_hash: string }>();
+
+  for (const member of results ?? []) {
+    if (await verifyPassword(String(body.pin), member.pin_code_hash)) {
+      const token = await issueToken(c.env.JWT_SECRET, {
+        sub: member.id,
+        email: `staff:${member.id}`,
+        role: "staff",
+        shopScope: shop.id,
+      });
+      return c.json({
+        token,
+        staff: { id: member.id, name: member.name },
+        shop: {
+          id: shop.id,
+          name: shop.name,
+          slug: body.slug,
+          theme_id: shop.theme_id,
+          theme_custom: shop.theme_custom,
+          logo_url: shop.logo_url,
+          tagline: shop.tagline,
+        },
+      });
+    }
+  }
+
+  return c.json({ error: "رمز PIN غير صحيح" }, 401);
+});

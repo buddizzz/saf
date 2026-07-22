@@ -1,0 +1,10 @@
+# انسخ إلى .dev.vars (غير مُتتبَّع في Git)
+JWT_SECRET=change-me
+PHONE_ENCRYPTION_KEY=change-me-long-random-string
+# عطّل 2FA مؤقتًا للاختبار المحلي:
+ADMIN_2FA_REQUIRED=false
+# WHATSAPP_TOKEN=
+# WHATSAPP_PHONE_NUMBER_ID=
+# WHATSAPP_VERIFY_TOKEN=
+# WHATSAPP_TEMPLATE_NAME=saf_marketing
+# WHATSAPP_TEMPLATE_LANG=ar
