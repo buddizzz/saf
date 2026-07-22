@@ -46,10 +46,42 @@ export default {
           "0%": { opacity: 0, transform: "scale(0.95)" },
           "100%": { opacity: 1, transform: "scale(1)" },
         },
+        float: {
+          "0%, 100%": { transform: "translate(0, 0) scale(1)" },
+          "50%": { transform: "translate(2%, -4%) scale(1.06)" },
+        },
+        "float-reverse": {
+          "0%, 100%": { transform: "translate(0, 0) scale(1)" },
+          "50%": { transform: "translate(-3%, 3%) scale(1.08)" },
+        },
+        "pop-in": {
+          "0%": { opacity: 0, transform: "scale(0.7) rotate(-4deg)" },
+          "60%": { opacity: 1, transform: "scale(1.08) rotate(2deg)" },
+          "100%": { opacity: 1, transform: "scale(1) rotate(0)" },
+        },
+        confetti: {
+          "0%": { transform: "translateY(0) rotate(0deg)", opacity: 0 },
+          "12%": { opacity: 1 },
+          "100%": { transform: "translateY(160px) rotate(220deg)", opacity: 0 },
+        },
+        "ring-expand": {
+          "0%": { transform: "scale(0.85)", opacity: 0.55 },
+          "100%": { transform: "scale(1.6)", opacity: 0 },
+        },
+        "dot-bounce": {
+          "0%, 100%": { transform: "translateY(0)" },
+          "50%": { transform: "translateY(-5px)" },
+        },
       },
       animation: {
         "fade-in": "fade-in 0.5s ease-out both",
         "scale-in": "scale-in 0.35s ease-out both",
+        float: "float 9s ease-in-out infinite",
+        "float-reverse": "float-reverse 11s ease-in-out infinite",
+        "pop-in": "pop-in 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both",
+        confetti: "confetti 2.4s linear infinite",
+        "ring-expand": "ring-expand 2.2s ease-out infinite",
+        "dot-bounce": "dot-bounce 1.2s ease-in-out infinite",
       },
     },
   },
