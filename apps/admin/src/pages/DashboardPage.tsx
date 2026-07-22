@@ -1,6 +1,12 @@
 import { FormEvent, useCallback, useEffect, useState } from "react";
+import { CampaignsTab } from "../components/CampaignsTab";
+import { FinanceTab } from "../components/FinanceTab";
+import { PlatformTab } from "../components/PlatformTab";
+import { ReportsTab } from "../components/ReportsTab";
+import { ShopDetailPanel } from "../components/ShopDetailPanel";
 import { adminFetch } from "../lib/api";
 import { useAdminAuth } from "../lib/auth";
+import { formatMoney, formatTs } from "../lib/format";
 import { TwoFactorSetupCard } from "./LoginPage";
 
 interface Overview {
@@ -13,6 +19,7 @@ interface Overview {
   upcoming: number;
   campaigns_pending?: number;
   campaigns_completed?: number;
+  campaigns_active?: number;
   messages_sent?: number;
 }
 
@@ -32,6 +39,9 @@ interface ShopRow {
   lng?: number | null;
   osm_display_name?: string | null;
   location_source?: string | null;
+  balance?: number;
+  owner_name?: string | null;
+  owner_email?: string | null;
 }
 
 interface AuditEntry {
@@ -44,20 +54,14 @@ interface AuditEntry {
   created_at: number;
 }
 
-interface PendingCampaign {
-  id: string;
-  name: string;
-  shop_id: string;
-  shop_name: string;
-  shop_slug: string;
-  audience_type: string;
-  audience_count: number;
-  cost: number;
-  message: string;
-  created_at: number;
-}
-
-type Tab = "overview" | "shops" | "campaigns" | "audit";
+type Tab =
+  | "overview"
+  | "shops"
+  | "reports"
+  | "campaigns"
+  | "finance"
+  | "platform"
+  | "audit";
 
 export function DashboardPage() {
   const { admin, logout, mustEnroll2fa } = useAdminAuth();
@@ -65,15 +69,14 @@ export function DashboardPage() {
   const [overview, setOverview] = useState<Overview | null>(null);
   const [shops, setShops] = useState<ShopRow[]>([]);
   const [query, setQuery] = useState("");
+  const [tierFilter, setTierFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
   const [audit, setAudit] = useState<AuditEntry[]>([]);
-  const [pending, setPending] = useState<PendingCampaign[]>([]);
+  const [auditQ, setAuditQ] = useState("");
+  const [auditAction, setAuditAction] = useState("");
+  const [detailId, setDetailId] = useState<string | null>(null);
   const [selected, setSelected] = useState<ShopRow | null>(null);
   const [reason, setReason] = useState("");
-  const [rejectReason, setRejectReason] = useState("");
-  const [rejectId, setRejectId] = useState<string | null>(null);
-  const [creditShop, setCreditShop] = useState<ShopRow | null>(null);
-  const [creditAmount, setCreditAmount] = useState("100");
-  const [creditReason, setCreditReason] = useState("");
   const [message, setMessage] = useState<string | null>(null);
 
   const canWrite = admin?.role === "super_admin" || admin?.role === "ops_admin";
@@ -88,32 +91,36 @@ export function DashboardPage() {
   }, [admin?.role]);
 
   const loadShops = useCallback(async () => {
+    const params = new URLSearchParams({ limit: "50" });
+    if (query.trim()) params.set("q", query.trim());
+    if (tierFilter) params.set("tier", tierFilter);
+    if (statusFilter) params.set("status", statusFilter);
     const res = await adminFetch<{ shops: ShopRow[] }>(
-      `/admin/shops?q=${encodeURIComponent(query)}&limit=50`,
+      `/admin/shops?${params}`,
     );
     setShops(res.shops);
-  }, [query]);
+  }, [query, tierFilter, statusFilter]);
 
   const loadAudit = useCallback(async () => {
     if (!canWrite) return;
-    const res = await adminFetch<{ entries: AuditEntry[] }>("/admin/audit-log");
-    setAudit(res.entries);
-  }, [canWrite]);
-
-  const loadPending = useCallback(async () => {
-    if (!canWrite) return;
-    const res = await adminFetch<{ campaigns: PendingCampaign[] }>(
-      "/admin/campaigns/pending",
+    const params = new URLSearchParams({ limit: "100" });
+    if (auditQ.trim()) params.set("q", auditQ.trim());
+    if (auditAction.trim()) params.set("action", auditAction.trim());
+    const res = await adminFetch<{ entries: AuditEntry[] }>(
+      `/admin/audit-log?${params}`,
     );
-    setPending(res.campaigns);
-  }, [canWrite]);
+    setAudit(res.entries);
+  }, [canWrite, auditQ, auditAction]);
 
   useEffect(() => {
     void loadOverview();
     void loadShops();
     void loadAudit();
-    void loadPending();
-  }, [loadOverview, loadShops, loadAudit, loadPending]);
+  }, [loadOverview, loadShops, loadAudit]);
+
+  const refreshAll = async () => {
+    await Promise.all([loadOverview(), loadShops(), loadAudit()]);
+  };
 
   const suspend = async (e: FormEvent) => {
     e.preventDefault();
@@ -125,17 +132,13 @@ export function DashboardPage() {
     setMessage("تم إيقاف المحل");
     setReason("");
     setSelected(null);
-    await loadShops();
-    await loadOverview();
-    await loadAudit();
+    await refreshAll();
   };
 
   const reactivate = async (shop: ShopRow) => {
     await adminFetch(`/admin/shops/${shop.id}/reactivate`, { method: "POST" });
     setMessage("تمت إعادة التفعيل");
-    await loadShops();
-    await loadOverview();
-    await loadAudit();
+    await refreshAll();
   };
 
   const setTier = async (shop: ShopRow, tier: "free" | "pro") => {
@@ -148,50 +151,22 @@ export function DashboardPage() {
       }),
     });
     setMessage(tier === "pro" ? "تمت الترقية لـ Pro" : "تم الرجوع للمجانية");
-    await loadShops();
-    await loadOverview();
-    await loadAudit();
+    await refreshAll();
   };
 
-  const approveCampaign = async (id: string) => {
-    await adminFetch(`/admin/campaigns/${id}/approve`, { method: "POST" });
-    setMessage("تمت الموافقة على الحملة وإرسالها");
-    await loadPending();
-    await loadOverview();
-    await loadAudit();
-  };
-
-  const rejectCampaign = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!rejectId || !rejectReason.trim()) return;
-    await adminFetch(`/admin/campaigns/${rejectId}/reject`, {
-      method: "POST",
-      body: JSON.stringify({ reason: rejectReason }),
-    });
-    setMessage("تم رفض الحملة واسترجاع الرصيد");
-    setRejectId(null);
-    setRejectReason("");
-    await loadPending();
-    await loadOverview();
-    await loadAudit();
-  };
-
-  const adjustBalance = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!creditShop || !creditReason.trim()) return;
-    await adminFetch(`/admin/shops/${creditShop.id}/balance-adjust`, {
-      method: "POST",
-      body: JSON.stringify({
-        amount: Number(creditAmount),
-        reason: creditReason,
-        apply_bonus: true,
-      }),
-    });
-    setMessage(`تم تعديل رصيد «${creditShop.name}»`);
-    setCreditShop(null);
-    setCreditReason("");
-    await loadAudit();
-  };
+  const tabs: Array<[Tab, string]> = [
+    ["overview", "نظرة عامة"],
+    ["shops", "المحلات"],
+    ...(canWrite
+      ? ([
+          ["reports", "البلاغات"],
+          ["campaigns", "الحملات"],
+          ["finance", "المالية"],
+          ["platform", "المنصة"],
+          ["audit", "سجل التدقيق"],
+        ] as Array<[Tab, string]>)
+      : []),
+  ];
 
   return (
     <div className="mx-auto min-h-screen max-w-6xl px-4 py-6">
@@ -209,20 +184,19 @@ export function DashboardPage() {
       </header>
 
       <nav className="mb-5 flex flex-wrap gap-2">
-        {(
-          [
-            ["overview", "نظرة عامة"],
-            ["shops", "المحلات"],
-            ...(canWrite ? [["campaigns", "مراجعة الحملات"] as const] : []),
-            ...(canWrite ? [["audit", "سجل التدقيق"] as const] : []),
-          ] as Array<[Tab, string]>
-        ).map(([id, label]) => (
+        {tabs.map(([id, label]) => (
           <button
             key={id}
             className={tab === id ? "btn-primary" : "btn-ghost"}
             onClick={() => setTab(id)}
           >
             {label}
+            {id === "reports" && overview && overview.open_reports > 0
+              ? ` (${overview.open_reports})`
+              : ""}
+            {id === "campaigns" && overview && (overview.campaigns_pending ?? 0) > 0
+              ? ` (${overview.campaigns_pending})`
+              : ""}
           </button>
         ))}
       </nav>
@@ -241,48 +215,93 @@ export function DashboardPage() {
 
       {tab === "overview" && overview && (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {[
-            ["إجمالي المحلات", overview.shops_total],
-            ["نشطة", overview.shops_active],
-            ["موقوفة", overview.shops_suspended],
-            ["Pro", overview.shops_pro],
-            ["مجانية", overview.shops_free],
-            ["بلاغات مفتوحة", overview.open_reports],
-            ["مواعيد قادمة", overview.upcoming],
-            ["حملات بانتظار المراجعة", overview.campaigns_pending ?? 0],
-            ["حملات مكتملة", overview.campaigns_completed ?? 0],
-            ["رسائل مُرسلة", overview.messages_sent ?? 0],
-          ].map(([label, value]) => (
-            <div key={String(label)} className="panel">
+          {(
+            [
+              ["إجمالي المحلات", overview.shops_total, "shops"],
+              ["نشطة", overview.shops_active, "shops"],
+              ["موقوفة", overview.shops_suspended, "shops"],
+              ["Pro", overview.shops_pro, "shops"],
+              ["مجانية", overview.shops_free, "shops"],
+              ["بلاغات مفتوحة", overview.open_reports, "reports"],
+              ["مواعيد قادمة", overview.upcoming, null],
+              [
+                "حملات بانتظار المراجعة",
+                overview.campaigns_pending ?? 0,
+                "campaigns",
+              ],
+              ["حملات نشطة", overview.campaigns_active ?? 0, "campaigns"],
+              ["حملات مكتملة", overview.campaigns_completed ?? 0, "campaigns"],
+              ["رسائل مُرسلة", overview.messages_sent ?? 0, "campaigns"],
+            ] as Array<[string, number, Tab | null]>
+          ).map(([label, value, target]) => (
+            <button
+              key={label}
+              type="button"
+              className="panel text-right transition hover:ring-2 hover:ring-accent-500/30"
+              onClick={() => {
+                if (target) setTab(target);
+              }}
+              disabled={!target}
+            >
               <div className="text-xs font-semibold text-ink-700/60">{label}</div>
               <div className="mt-1 font-mono text-3xl font-bold text-ink-900">
                 {value ?? 0}
               </div>
-            </div>
+            </button>
           ))}
         </div>
       )}
 
       {tab === "shops" && (
         <div className="space-y-4">
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <input
               className="field max-w-sm"
-              placeholder="بحث بالاسم / slug / id"
+              placeholder="بحث: اسم / slug / بريد المالك"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
+            <select
+              className="field max-w-[140px]"
+              value={tierFilter}
+              onChange={(e) => setTierFilter(e.target.value)}
+            >
+              <option value="">كل الباقات</option>
+              <option value="free">Free</option>
+              <option value="pro">Pro</option>
+            </select>
+            <select
+              className="field max-w-[140px]"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+            >
+              <option value="">كل الحالات</option>
+              <option value="active">نشط</option>
+              <option value="suspended">موقوف</option>
+            </select>
             <button className="btn-ghost" onClick={() => void loadShops()}>
               بحث
             </button>
           </div>
 
+          {detailId && (
+            <ShopDetailPanel
+              shopId={detailId}
+              canWrite={canWrite}
+              isSuper={isSuper}
+              onClose={() => setDetailId(null)}
+              onChanged={() => void refreshAll()}
+            />
+          )}
+
           <div className="panel overflow-x-auto p-0">
-            <table className="w-full min-w-[640px] text-sm">
+            <table className="w-full min-w-[780px] text-sm">
               <thead className="border-b border-ink-100 bg-ink-50 text-xs text-ink-700/70">
                 <tr>
                   <th className="px-4 py-3 text-right font-semibold">المحل</th>
+                  <th className="px-4 py-3 text-right font-semibold">المالك</th>
                   <th className="px-4 py-3 text-right font-semibold">الباقة</th>
+                  <th className="px-4 py-3 text-right font-semibold">الرصيد</th>
                   <th className="px-4 py-3 text-right font-semibold">الحالة</th>
                   <th className="px-4 py-3 text-right font-semibold">إجراءات</th>
                 </tr>
@@ -291,7 +310,12 @@ export function DashboardPage() {
                 {shops.map((shop) => (
                   <tr key={shop.id} className="border-b border-ink-50">
                     <td className="px-4 py-3">
-                      <div className="font-semibold">{shop.name}</div>
+                      <button
+                        className="text-right font-semibold text-accent-600 hover:underline"
+                        onClick={() => setDetailId(shop.id)}
+                      >
+                        {shop.name}
+                      </button>
                       <div className="font-mono text-xs text-ink-700/60" dir="ltr">
                         /{shop.slug}
                       </div>
@@ -300,11 +324,12 @@ export function DashboardPage() {
                           {shop.osm_display_name}
                         </div>
                       )}
-                      {shop.lat != null && shop.lng != null && (
-                        <div className="font-mono text-[10px] text-ink-700/40" dir="ltr">
-                          {shop.lat.toFixed(4)}, {shop.lng.toFixed(4)}
-                        </div>
-                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="text-sm">{shop.owner_name ?? "—"}</div>
+                      <div className="text-xs text-ink-700/60" dir="ltr">
+                        {shop.owner_email ?? ""}
+                      </div>
                     </td>
                     <td className="px-4 py-3">
                       <span
@@ -317,6 +342,9 @@ export function DashboardPage() {
                         {shop.subscription_tier} · {shop.subscription_status}
                       </span>
                     </td>
+                    <td className="px-4 py-3 font-mono text-xs">
+                      {formatMoney(shop.balance ?? 0)}
+                    </td>
                     <td className="px-4 py-3">
                       {shop.suspended_at ? (
                         <span className="text-rose-600">موقوف</span>
@@ -328,6 +356,12 @@ export function DashboardPage() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex flex-wrap gap-1">
+                        <button
+                          className="btn-ghost !px-2 !py-1 text-xs"
+                          onClick={() => setDetailId(shop.id)}
+                        >
+                          تفاصيل
+                        </button>
                         {canWrite && !shop.suspended_at && (
                           <button
                             className="btn-danger !px-2 !py-1 text-xs"
@@ -342,14 +376,6 @@ export function DashboardPage() {
                             onClick={() => void reactivate(shop)}
                           >
                             تفعيل
-                          </button>
-                        )}
-                        {isSuper && (
-                          <button
-                            className="btn-ghost !px-2 !py-1 text-xs"
-                            onClick={() => setCreditShop(shop)}
-                          >
-                            رصيد
                           </button>
                         )}
                         {isSuper && shop.subscription_tier !== "pro" && (
@@ -400,139 +426,71 @@ export function DashboardPage() {
               </div>
             </form>
           )}
-
-          {creditShop && (
-            <form onSubmit={adjustBalance} className="panel max-w-lg space-y-3">
-              <h3 className="font-bold">تعديل رصيد «{creditShop.name}»</h3>
-              <p className="text-xs text-ink-700/60">
-                بوابة الدفع مؤجّلة — الشحن اليدوي من هنا لتشغيل الحملات.
-              </p>
-              <div>
-                <label className="label">المبلغ (موجب للشحن / سالب للخصم)</label>
-                <input
-                  className="field"
-                  type="number"
-                  step="0.01"
-                  value={creditAmount}
-                  onChange={(e) => setCreditAmount(e.target.value)}
-                  required
-                />
-              </div>
-              <div>
-                <label className="label">السبب (إلزامي)</label>
-                <input
-                  className="field"
-                  value={creditReason}
-                  onChange={(e) => setCreditReason(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="flex gap-2">
-                <button className="btn-primary">حفظ</button>
-                <button
-                  type="button"
-                  className="btn-ghost"
-                  onClick={() => setCreditShop(null)}
-                >
-                  إلغاء
-                </button>
-              </div>
-            </form>
-          )}
         </div>
       )}
 
-      {tab === "campaigns" && (
+      {tab === "reports" && canWrite && (
+        <ReportsTab onChanged={() => void refreshAll()} />
+      )}
+
+      {tab === "campaigns" && canWrite && (
+        <CampaignsTab onChanged={() => void refreshAll()} />
+      )}
+
+      {tab === "finance" && canWrite && <FinanceTab />}
+
+      {tab === "platform" && canWrite && <PlatformTab isSuper={isSuper} />}
+
+      {tab === "audit" && canWrite && (
         <div className="space-y-4">
-          <p className="text-sm text-ink-700/70">
-            حملات «عملاء جدد» الكبيرة أو التي تحتوي كلمات محظورة تنتظر موافقة يدوية.
-          </p>
-          {pending.length === 0 ? (
-            <div className="panel text-sm text-ink-700/60">لا توجد حملات بانتظار المراجعة</div>
-          ) : (
-            pending.map((c) => (
-              <div key={c.id} className="panel space-y-3">
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div>
-                    <div className="font-bold">{c.name}</div>
-                    <div className="text-xs text-ink-700/60">
-                      {c.shop_name} · /{c.shop_slug} · {c.audience_type} ·{" "}
-                      {c.audience_count} مستهدف · {c.cost} SAR
-                    </div>
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      className="btn-primary !px-3 !py-1 text-xs"
-                      onClick={() => void approveCampaign(c.id)}
-                    >
-                      موافقة وإرسال
-                    </button>
-                    <button
-                      className="btn-danger !px-3 !py-1 text-xs"
-                      onClick={() => setRejectId(c.id)}
-                    >
-                      رفض
-                    </button>
-                  </div>
-                </div>
-                <pre className="whitespace-pre-wrap rounded-lg bg-ink-50 p-3 text-sm">
-                  {c.message}
-                </pre>
-              </div>
-            ))
-          )}
-
-          {rejectId && (
-            <form onSubmit={rejectCampaign} className="panel max-w-lg space-y-3">
-              <h3 className="font-bold">رفض الحملة</h3>
-              <textarea
-                className="field min-h-[80px]"
-                value={rejectReason}
-                onChange={(e) => setRejectReason(e.target.value)}
-                placeholder="سبب الرفض (يصل للمالك)"
-                required
-              />
-              <div className="flex gap-2">
-                <button className="btn-danger">تأكيد الرفض</button>
-                <button
-                  type="button"
-                  className="btn-ghost"
-                  onClick={() => setRejectId(null)}
-                >
-                  إلغاء
-                </button>
-              </div>
-            </form>
-          )}
-        </div>
-      )}
-
-      {tab === "audit" && (
-        <div className="panel overflow-x-auto p-0">
-          <table className="w-full min-w-[640px] text-sm">
-            <thead className="border-b border-ink-100 bg-ink-50 text-xs text-ink-700/70">
-              <tr>
-                <th className="px-4 py-3 text-right">الإجراء</th>
-                <th className="px-4 py-3 text-right">الهدف</th>
-                <th className="px-4 py-3 text-right">الأدمن</th>
-                <th className="px-4 py-3 text-right">السبب</th>
-              </tr>
-            </thead>
-            <tbody>
-              {audit.map((entry) => (
-                <tr key={entry.id} className="border-b border-ink-50">
-                  <td className="px-4 py-3 font-mono text-xs">{entry.action}</td>
-                  <td className="px-4 py-3 font-mono text-xs">
-                    {entry.target_type}:{entry.target_id.slice(0, 16)}
-                  </td>
-                  <td className="px-4 py-3">{entry.admin_email ?? "—"}</td>
-                  <td className="px-4 py-3 text-ink-700/70">
-                    {entry.reason ?? "—"}
-                  </td>
+          <div className="flex flex-wrap gap-2">
+            <input
+              className="field max-w-xs"
+              placeholder="بحث: هدف / سبب / أدمن"
+              value={auditQ}
+              onChange={(e) => setAuditQ(e.target.value)}
+            />
+            <input
+              className="field max-w-[180px]"
+              placeholder="بادئة الإجراء (shop.)"
+              value={auditAction}
+              onChange={(e) => setAuditAction(e.target.value)}
+              dir="ltr"
+            />
+            <button className="btn-ghost" onClick={() => void loadAudit()}>
+              تصفية
+            </button>
+          </div>
+          <div className="panel overflow-x-auto p-0">
+            <table className="w-full min-w-[720px] text-sm">
+              <thead className="border-b border-ink-100 bg-ink-50 text-xs text-ink-700/70">
+                <tr>
+                  <th className="px-4 py-3 text-right">الإجراء</th>
+                  <th className="px-4 py-3 text-right">الهدف</th>
+                  <th className="px-4 py-3 text-right">الأدمن</th>
+                  <th className="px-4 py-3 text-right">السبب</th>
+                  <th className="px-4 py-3 text-right">الوقت</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {audit.map((entry) => (
+                  <tr key={entry.id} className="border-b border-ink-50">
+                    <td className="px-4 py-3 font-mono text-xs">{entry.action}</td>
+                    <td className="px-4 py-3 font-mono text-xs">
+                      {entry.target_type}:{entry.target_id.slice(0, 16)}
+                    </td>
+                    <td className="px-4 py-3">{entry.admin_email ?? "—"}</td>
+                    <td className="px-4 py-3 text-ink-700/70">
+                      {entry.reason ?? "—"}
+                    </td>
+                    <td className="px-4 py-3 text-xs">
+                      {formatTs(entry.created_at)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>
