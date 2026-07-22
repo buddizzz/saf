@@ -1,0 +1,173 @@
+import { Hono } from "hono";
+import type { AppEnv } from "../lib/http";
+import { isValidSaudiPhone, requireFields } from "../lib/http";
+import { isWithinWorkingHours } from "../lib/hours";
+import { requireAuth } from "../middleware/auth";
+import {
+  callNext,
+  completeCurrent,
+  getBySession,
+  getSnapshot,
+  joinQueue,
+  rateEntry,
+  skipCurrent,
+} from "../lib/queue";
+
+export const queueRoutes = new Hono<AppEnv>();
+
+function stubFor(c: { env: AppEnv["Bindings"] }, shopId: string) {
+  const id = c.env.SHOP_QUEUE.idFromName(shopId);
+  return c.env.SHOP_QUEUE.get(id);
+}
+
+async function assertOwnsShop(
+  c: { env: AppEnv["Bindings"] },
+  ownerId: string,
+  shopId: string,
+): Promise<boolean> {
+  const shop = await c.env.DB.prepare(
+    "SELECT id FROM shops WHERE id = ? AND owner_id = ?",
+  )
+    .bind(shopId, ownerId)
+    .first();
+  return !!shop;
+}
+
+// انضمام عميل للطابور عبر رابط المحل.
+queueRoutes.post("/join", async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  const err = requireFields(body, ["slug", "name", "phone"]);
+  if (err) return c.json({ error: err }, 400);
+  if (!isValidSaudiPhone(body.phone)) {
+    return c.json({ error: "رقم الجوال يجب أن يكون بصيغة +9665XXXXXXXX" }, 400);
+  }
+  if (body.consent !== true) {
+    return c.json({ error: "الموافقة على حفظ البيانات مطلوبة" }, 400);
+  }
+
+  const shop = await c.env.DB.prepare(
+    "SELECT id, is_active, is_accepting_queue, working_hours FROM shops WHERE slug = ?",
+  )
+    .bind(body.slug)
+    .first<{
+      id: string;
+      is_active: number;
+      is_accepting_queue: number;
+      working_hours: string | null;
+    }>();
+  if (!shop) return c.json({ error: "المحل غير موجود" }, 404);
+  if (shop.is_accepting_queue !== 1 || shop.is_active !== 1) {
+    return c.json({ error: "المحل لا يستقبل عملاء حاليًا" }, 409);
+  }
+  if (!isWithinWorkingHours(shop.working_hours)) {
+    return c.json({ error: "المحل مغلق حاليًا خارج ساعات العمل" }, 409);
+  }
+
+  const entry = await joinQueue(c.env.DB, shop.id, {
+    name: body.name,
+    phone: body.phone,
+    gender: body.gender ?? null,
+    ageCategory: body.age_category ?? null,
+    consent: true,
+  });
+
+  await stubFor(c, shop.id).broadcast(shop.id);
+  const snapshot = await getSnapshot(c.env.DB, shop.id);
+
+  return c.json(
+    {
+      queueNumber: entry.queue_number,
+      sessionToken: entry.session_token,
+      shopId: shop.id,
+      snapshot,
+    },
+    201,
+  );
+});
+
+// استرجاع حالة العميل عبر session token (بعد إعادة فتح الصفحة).
+queueRoutes.get("/session/:token", async (c) => {
+  const result = await getBySession(c.env.DB, c.req.param("token"));
+  if (!result) return c.json({ error: "الجلسة غير موجودة" }, 404);
+  const { entry, snapshot } = result;
+  return c.json({
+    entry: {
+      queueNumber: entry.queue_number,
+      name: entry.customer_name,
+      status: entry.status,
+      shopId: entry.shop_id,
+    },
+    snapshot,
+  });
+});
+
+// تقييم بعد الخدمة.
+queueRoutes.post("/session/:token/rating", async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  const rating = Number(body.rating);
+  if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+    return c.json({ error: "التقييم يجب أن يكون بين 1 و 5" }, 400);
+  }
+  const ok = await rateEntry(c.env.DB, c.req.param("token"), rating);
+  if (!ok) return c.json({ error: "لا يمكن التقييم قبل انتهاء الخدمة" }, 409);
+  return c.json({ ok: true });
+});
+
+// ترقية WebSocket → توجيه إلى الكائن الدائم للمحل.
+queueRoutes.get("/:shopId/ws", async (c) => {
+  const shopId = c.req.param("shopId");
+  const url = new URL(c.req.url);
+  url.searchParams.set("shopId", shopId);
+  return stubFor(c, shopId).fetch(new Request(url.toString(), c.req.raw));
+});
+
+// قائمة اليوم (لصاحب المحل).
+queueRoutes.get("/:shopId/list", requireAuth, async (c) => {
+  const auth = c.get("auth");
+  const shopId = c.req.param("shopId");
+  if (!(await assertOwnsShop(c, auth.sub, shopId))) {
+    return c.json({ error: "غير مصرّح لهذا المحل" }, 403);
+  }
+  const snapshot = await getSnapshot(c.env.DB, shopId);
+  return c.json({ snapshot });
+});
+
+// استدعاء العميل التالي.
+queueRoutes.post("/:shopId/next", requireAuth, async (c) => {
+  const auth = c.get("auth");
+  const shopId = c.req.param("shopId");
+  if (!(await assertOwnsShop(c, auth.sub, shopId))) {
+    return c.json({ error: "غير مصرّح لهذا المحل" }, 403);
+  }
+  const number = await callNext(c.env.DB, shopId);
+  if (number === null) {
+    await stubFor(c, shopId).broadcast(shopId);
+    return c.json({ called: null, message: "لا يوجد عملاء في الانتظار" });
+  }
+  await stubFor(c, shopId).onCustomerCalled(shopId);
+  return c.json({ called: number });
+});
+
+// تخطي العميل المستدعى حاليًا.
+queueRoutes.post("/:shopId/skip", requireAuth, async (c) => {
+  const auth = c.get("auth");
+  const shopId = c.req.param("shopId");
+  if (!(await assertOwnsShop(c, auth.sub, shopId))) {
+    return c.json({ error: "غير مصرّح لهذا المحل" }, 403);
+  }
+  await skipCurrent(c.env.DB, shopId, "cancelled");
+  await stubFor(c, shopId).broadcast(shopId);
+  return c.json({ ok: true });
+});
+
+// إتمام خدمة العميل المستدعى حاليًا.
+queueRoutes.post("/:shopId/complete", requireAuth, async (c) => {
+  const auth = c.get("auth");
+  const shopId = c.req.param("shopId");
+  if (!(await assertOwnsShop(c, auth.sub, shopId))) {
+    return c.json({ error: "غير مصرّح لهذا المحل" }, 403);
+  }
+  await completeCurrent(c.env.DB, shopId);
+  await stubFor(c, shopId).broadcast(shopId);
+  return c.json({ ok: true });
+});

@@ -1,0 +1,39 @@
+import { Navigate, Route, Routes } from "react-router-dom";
+import { useAuth } from "./lib/auth";
+import { LandingPage } from "./pages/LandingPage";
+import { RegisterPage } from "./pages/RegisterPage";
+import { LoginPage } from "./pages/LoginPage";
+import { DashboardPage } from "./pages/DashboardPage";
+import { QueuePage } from "./pages/QueuePage";
+
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const { owner, loading } = useAuth();
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center text-brand-600">
+        جارٍ التحميل…
+      </div>
+    );
+  }
+  return owner ? <>{children}</> : <Navigate to="/login" replace />;
+}
+
+export function App() {
+  return (
+    <Routes>
+      <Route path="/" element={<LandingPage />} />
+      <Route path="/register" element={<RegisterPage />} />
+      <Route path="/login" element={<LoginPage />} />
+      <Route
+        path="/dashboard"
+        element={
+          <ProtectedRoute>
+            <DashboardPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route path="/q/:slug" element={<QueuePage />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  );
+}

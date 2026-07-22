@@ -1,0 +1,23 @@
+name = "saf-api"
+main = "src/index.ts"
+compatibility_date = "2024-11-06"
+compatibility_flags = ["nodejs_compat"]
+
+# القيم السرية الحقيقية تُضاف عبر `wrangler secret put` أو ملف .dev.vars محليًا.
+[vars]
+ENVIRONMENT = "development"
+ALLOWED_ORIGINS = "http://localhost:5173,http://127.0.0.1:5173"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "saf-db"
+database_id = "local-saf-db"
+migrations_dir = "migrations"
+
+[[durable_objects.bindings]]
+name = "SHOP_QUEUE"
+class_name = "ShopQueue"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["ShopQueue"]
