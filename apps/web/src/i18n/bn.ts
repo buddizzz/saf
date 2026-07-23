@@ -10,6 +10,8 @@ export const bn: Translations = {
     back: "ফিরে যান",
   },
   landing: {
+    heroKicker: "কিউ ব্যবস্থাপনা প্ল্যাটফর্ম",
+    marqueeTitle: "সব ধরনের ব্যবসার জন্য তৈরি",
     heroTitle: "আপনার গ্রাহক সারি সহজেই সাজান",
     heroSubtitle:
       "আপনার দোকানের জন্য QR কোড তৈরি করুন, অপেক্ষার তালিকা রিয়েল টাইমে পরিচালনা করুন, এবং তাৎক্ষণিক সতর্কতার সাথে গ্রাহকদের মসৃণ অপেক্ষা দিন।",
@@ -21,6 +23,7 @@ export const bn: Translations = {
     feature2Body: "প্রতিটি দোকানের জন্য প্রিন্টযোগ্য লিংক ও QR কোড।",
     feature3Title: "স্মার্ট সতর্কতা",
     feature3Body: "গ্রাহকের পালা কাছাকাছি এলে শব্দ ও কম্পন।",
+    featuresKicker: "কেন SAF?",
     newBadgeTag: "নতুন",
     newBadgeText: "আপনার লোগো ও রঙসহ সম্পূর্ণ ব্র্যান্ড পরিচয়",
     statsTitle: "সংখ্যা যা নিজেই বলে",
@@ -82,6 +85,13 @@ export const bn: Translations = {
       salon: "সালুন",
       other: "অন্যান্য",
     },
+    status: {
+      waiting: "অপেক্ষমাণ",
+      called: "ডাকা হয়েছে",
+      served: "সেবা সম্পন্ন",
+      cancelled: "বাতিল",
+      no_show: "আসেননি",
+    },
   },
   queue: {
     joinTitle: "সারিতে যোগ দিন",
@@ -98,6 +108,9 @@ export const bn: Translations = {
     join: "এখনই যোগ দিন",
     shopClosed: "দোকান বর্তমানে বন্ধ",
     closedHint: "আবার কখন খুলবে জানতে পরে দেখুন।",
+    openNow: "এখন খোলা",
+    closedNow: "বন্ধ",
+    adBanner: "আপনার দোকান Pro-তে আপগ্রেড করুন — বিজ্ঞাপন ছাড়া + রিমোট বুকিং",
     yourNumber: "আপনার সারি নম্বর",
     peopleAhead: "আপনার আগে",
     person: "জন",

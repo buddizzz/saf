@@ -10,6 +10,8 @@ export const hi: Translations = {
     back: "वापस",
   },
   landing: {
+    heroKicker: "कतार प्रबंधन प्लेटफ़ॉर्म",
+    marqueeTitle: "हर तरह के व्यवसाय के लिए बना",
     heroTitle: "अपनी ग्राहक कतार को आसानी से व्यवस्थित करें",
     heroSubtitle:
       "अपनी दुकान के लिए QR कोड बनाएँ, प्रतीक्षा सूची को वास्तविक समय में प्रबंधित करें, और तत्काल अलर्ट के साथ ग्राहकों को सहज प्रतीक्षा दें।",
@@ -21,6 +23,7 @@ export const hi: Translations = {
     feature2Body: "हर दुकान के लिए प्रिंट करने योग्य लिंक और QR कोड।",
     feature3Title: "स्मार्ट अलर्ट",
     feature3Body: "ग्राहक की बारी नज़दीक आने पर ध्वनि और कंपन।",
+    featuresKicker: "SAF ही क्यों?",
     newBadgeTag: "नया",
     newBadgeText: "आपके लोगो और रंगों के साथ पूर्ण ब्रांड पहचान",
     statsTitle: "आंकड़े जो खुद बोलते हैं",
@@ -82,6 +85,13 @@ export const hi: Translations = {
       salon: "सैलून",
       other: "अन्य",
     },
+    status: {
+      waiting: "प्रतीक्षा में",
+      called: "बुलाया गया",
+      served: "सेवा पूर्ण",
+      cancelled: "रद्द",
+      no_show: "नहीं आया",
+    },
   },
   queue: {
     joinTitle: "कतार में शामिल हों",
@@ -98,6 +108,9 @@ export const hi: Translations = {
     join: "अभी शामिल हों",
     shopClosed: "दुकान वर्तमान में बंद है",
     closedHint: "फिर कब खुले, यह जानने के लिए बाद में देखें।",
+    openNow: "अभी खुला है",
+    closedNow: "बंद",
+    adBanner: "अपनी दुकान को Pro पर अपग्रेड करें — बिना विज्ञापन + रिमोट बुकिंग",
     yourNumber: "आपका कतार नंबर",
     peopleAhead: "आपसे आगे",
     person: "लोग",

@@ -63,7 +63,7 @@ export function UnsubscribePage() {
       </header>
       <main className="mx-auto max-w-lg px-6 pb-16">
         <div className="card space-y-4">
-          <h1 className="text-xl font-extrabold text-brand-800">
+          <h1 className="text-2xl font-black tracking-tight text-brand-950">
             {t("unsubscribe.title")}
           </h1>
           {loading ? (

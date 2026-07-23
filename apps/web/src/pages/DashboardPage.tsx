@@ -37,7 +37,7 @@ export function DashboardPage() {
 
   return (
     <div className="min-h-screen">
-      <header className="sticky top-0 z-10 border-b border-slate-100 bg-white/90 backdrop-blur-sm">
+      <header className="sticky top-0 z-10 border-b border-brand-900/5 bg-white/80 backdrop-blur-xl">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <Logo />
           <div className="flex items-center gap-3">
@@ -81,9 +81,9 @@ export function DashboardPage() {
                 <button
                   key={shop.id}
                   onClick={() => setSelectedId(shop.id)}
-                  className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-right font-bold transition ${
+                  className={`flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-right font-bold transition ${
                     shop.id === selectedId
-                      ? "bg-brand-600 text-white shadow-soft"
+                      ? "bg-gradient-to-l from-brand-600 to-brand-800 text-white shadow-soft"
                       : "bg-white text-brand-700 hover:bg-brand-50"
                   }`}
                 >
@@ -152,7 +152,7 @@ function ShopManager({ shop, onChange }: { shop: Shop; onChange: () => void }) {
         <div className="flex items-center gap-3">
           <ShopAvatar shop={shop} size={44} />
           <div>
-            <h1 className="text-2xl font-extrabold text-brand-800">
+            <h1 className="text-2xl font-black tracking-tight text-brand-950">
               {shop.name}
               {shop.subscription_tier === "pro" && (
                 <span className="ms-2 align-middle rounded-full bg-gradient-to-l from-gold-400 to-gold-500 px-2 py-0.5 text-xs font-extrabold text-brand-900">
@@ -293,6 +293,7 @@ function badge(status: string): string {
 }
 
 function StatusPill({ status }: { status: string }) {
+  const { t } = useTranslation();
   const map: Record<string, string> = {
     waiting: "bg-brand-50 text-brand-600",
     called: "bg-gold-100 text-gold-700",
@@ -300,16 +301,9 @@ function StatusPill({ status }: { status: string }) {
     cancelled: "bg-slate-100 text-slate-400",
     no_show: "bg-rose-50 text-rose-500",
   };
-  const label: Record<string, string> = {
-    waiting: "بالانتظار",
-    called: "مستدعى",
-    served: "تمت الخدمة",
-    cancelled: "ملغى",
-    no_show: "لم يحضر",
-  };
   return (
     <span className={`rounded-full px-3 py-1 text-xs font-bold ${map[status]}`}>
-      {label[status] ?? status}
+      {t(`dashboard.status.${status}`, status)}
     </span>
   );
 }
@@ -320,7 +314,7 @@ function CreateShopInline({ onCreated }: { onCreated: () => void }) {
   if (!open) {
     return (
       <button
-        className="w-full rounded-xl border border-dashed border-brand-200 px-4 py-3 text-sm font-bold text-brand-500 hover:bg-brand-50"
+        className="w-full rounded-2xl border border-dashed border-brand-300 px-4 py-3 text-sm font-bold text-brand-500 transition hover:border-gold-400 hover:bg-gold-50 hover:text-gold-600"
         onClick={() => setOpen(true)}
       >
         + {t("dashboard.createShop")}

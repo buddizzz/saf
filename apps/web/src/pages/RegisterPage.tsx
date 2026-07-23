@@ -99,7 +99,8 @@ export function AuthShell({
   const { t } = useTranslation();
   return (
     <div className="grid min-h-screen lg:grid-cols-2">
-      <div className="flex flex-col px-6 py-5">
+      <div className="relative flex flex-col px-6 py-5">
+        <div className="pointer-events-none absolute -top-24 start-1/4 -z-10 h-72 w-72 animate-orb-drift rounded-full bg-brand-200/40 blur-3xl" />
         <header className="mx-auto flex w-full max-w-md items-center justify-between py-5 lg:mx-0">
           <Link to="/">
             <Logo />
@@ -107,25 +108,26 @@ export function AuthShell({
           <LanguageSwitcher />
         </header>
         <main className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center py-8">
-          <h1 className="mb-6 animate-fade-in text-2xl font-extrabold text-brand-800">
+          <h1 className="mb-6 animate-fade-in text-3xl font-black tracking-tight text-brand-950">
             {title}
           </h1>
           <div className="card animate-scale-in">{children}</div>
         </main>
       </div>
-      <div className="relative hidden overflow-hidden bg-gradient-to-br from-brand-700 via-brand-800 to-brand-900 lg:flex lg:items-center lg:justify-center">
-        <div className="pointer-events-none absolute -top-24 end-[-4rem] h-72 w-72 rounded-full bg-gold-400/20 blur-3xl" />
-        <div className="pointer-events-none absolute bottom-[-4rem] start-[-2rem] h-72 w-72 rounded-full bg-brand-400/30 blur-3xl" />
+      <div className="grain relative hidden overflow-hidden bg-brand-950 lg:flex lg:items-center lg:justify-center">
+        <div className="pointer-events-none absolute -top-24 end-[-4rem] h-80 w-80 animate-orb-drift rounded-full bg-gold-400/20 blur-3xl" />
+        <div className="pointer-events-none absolute bottom-[-4rem] start-[-2rem] h-80 w-80 animate-orb-drift rounded-full bg-brand-500/30 blur-3xl [animation-delay:5s]" />
         <div className="relative z-10 max-w-sm px-10 text-center text-white">
           <Logo
             size={72}
             showTagline
             inverted
-            className="mb-8 inline-flex rounded-2xl bg-white/10 px-5 py-4 backdrop-blur-sm"
+            className="mb-8 inline-flex rounded-3xl bg-white/10 px-5 py-4 ring-1 ring-white/15 backdrop-blur-sm"
           />
-          <p className="text-xl font-extrabold leading-relaxed">
+          <p className="text-2xl font-black leading-relaxed">
             {t("auth.brandPitch")}
           </p>
+          <span className="mx-auto mt-8 block h-px w-16 bg-gold-400/60" />
         </div>
       </div>
     </div>

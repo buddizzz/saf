@@ -14,7 +14,7 @@ export function PrivacyPage() {
         <LanguageSwitcher />
       </header>
       <main className="mx-auto max-w-3xl px-6 py-8">
-        <h1 className="mb-6 text-3xl font-extrabold text-brand-800">
+        <h1 className="mb-6 animate-fade-in text-4xl font-black tracking-tight text-brand-950">
           {t("privacy.title")}
         </h1>
         <div className="card">

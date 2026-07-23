@@ -10,6 +10,8 @@ export const en: Translations = {
     back: "Back",
   },
   landing: {
+    heroKicker: "Queue management platform",
+    marqueeTitle: "Built for every kind of business",
     heroTitle: "Organize your customer queue effortlessly",
     heroSubtitle:
       "Create a QR code for your shop, manage the waiting list in real time, and give customers a smooth wait with instant alerts.",
@@ -21,6 +23,7 @@ export const en: Translations = {
     feature2Body: "A printable link and QR code for each shop.",
     feature3Title: "Smart alerts",
     feature3Body: "Sound and vibration when the customer's turn approaches.",
+    featuresKicker: "Why SAF?",
     newBadgeTag: "New",
     newBadgeText: "A full brand identity with your logo and colors",
     statsTitle: "Numbers that speak for themselves",
@@ -82,6 +85,13 @@ export const en: Translations = {
       salon: "Salon",
       other: "Other",
     },
+    status: {
+      waiting: "Waiting",
+      called: "Called",
+      served: "Served",
+      cancelled: "Cancelled",
+      no_show: "No-show",
+    },
   },
   queue: {
     joinTitle: "Join the queue",
@@ -98,6 +108,9 @@ export const en: Translations = {
     join: "Join now",
     shopClosed: "The shop is currently closed",
     closedHint: "Check back to see when we're open again.",
+    openNow: "Open now",
+    closedNow: "Closed",
+    adBanner: "Upgrade your shop to Pro — no ads + remote booking",
     yourNumber: "Your queue number",
     peopleAhead: "Ahead of you",
     person: "people",

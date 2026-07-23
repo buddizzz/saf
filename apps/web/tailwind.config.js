@@ -16,6 +16,7 @@ export default {
           700: "#1b5460",
           800: "#1a4551",
           900: "#183b45",
+          950: "#0c2129",
         },
         gold: {
           50: "#fdf7ec",
@@ -35,7 +36,7 @@ export default {
       },
       boxShadow: {
         soft: "0 10px 40px -12px rgba(26, 69, 81, 0.25)",
-        glow: "0 0 0 4px var(--saf-accent, rgba(224, 162, 78, 0.4)), 0 20px 45px -15px rgba(26, 69, 81, 0.35)",
+        card: "0 1px 2px rgba(12, 33, 41, 0.04), 0 12px 32px -16px rgba(12, 33, 41, 0.18)",
       },
       keyframes: {
         "fade-in": {
@@ -72,6 +73,19 @@ export default {
           "0%, 100%": { transform: "translateY(0)" },
           "50%": { transform: "translateY(-5px)" },
         },
+        marquee: {
+          "0%": { transform: "translateX(0)" },
+          "100%": { transform: "translateX(-50%)" },
+        },
+        "gradient-pan": {
+          "0%": { backgroundPosition: "0% 50%" },
+          "100%": { backgroundPosition: "200% 50%" },
+        },
+        "orb-drift": {
+          "0%, 100%": { transform: "translate(0, 0) scale(1)" },
+          "33%": { transform: "translate(4%, -6%) scale(1.1)" },
+          "66%": { transform: "translate(-5%, 4%) scale(0.94)" },
+        },
       },
       animation: {
         "fade-in": "fade-in 0.5s ease-out both",
@@ -82,6 +96,9 @@ export default {
         confetti: "confetti 2.4s linear infinite",
         "ring-expand": "ring-expand 2.2s ease-out infinite",
         "dot-bounce": "dot-bounce 1.2s ease-in-out infinite",
+        marquee: "marquee 28s linear infinite",
+        "gradient-pan": "gradient-pan 5s linear infinite",
+        "orb-drift": "orb-drift 14s ease-in-out infinite",
       },
     },
   },

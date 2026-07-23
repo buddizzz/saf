@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { apiFetch, assetUrl } from "../lib/api";
 import { resolveShopTheme, themeVars } from "../themes";
 import { Logo } from "../components/Logo";
+import { LanguageSwitcher } from "../components/LanguageSwitcher";
 
 interface BookShop {
   id: string;
@@ -137,13 +138,16 @@ export function BookingPage() {
       <div className="mx-auto flex min-h-screen max-w-lg flex-col px-5 py-8">
         <div className="mb-8 flex items-center justify-between">
           <Logo size={32} />
-          <Link
-            to={`/q/${shop.slug}`}
-            className="text-sm font-bold hover:underline"
-            style={{ color: theme.primary }}
-          >
-            {t("booking.liveQueue")}
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link
+              to={`/q/${shop.slug}`}
+              className="text-sm font-bold hover:underline"
+              style={{ color: theme.primary }}
+            >
+              {t("booking.liveQueue")}
+            </Link>
+            <LanguageSwitcher />
+          </div>
         </div>
 
         <div className="animate-fade-in text-center">

@@ -10,6 +10,8 @@ export const ur: Translations = {
     back: "واپس",
   },
   landing: {
+    heroKicker: "قطار مینجمنٹ پلیٹ فارم",
+    marqueeTitle: "ہر قسم کے کاروبار کے لیے بنایا گیا",
     heroTitle: "اپنی کسٹمر قطار کو آسانی سے منظم کریں",
     heroSubtitle:
       "اپنی دکان کے لیے QR کوڈ بنائیں، انتظار کی فہرست کو حقیقی وقت میں سنبھالیں، اور فوری الرٹس کے ساتھ گاہکوں کو آرام دہ انتظار دیں۔",
@@ -21,6 +23,7 @@ export const ur: Translations = {
     feature2Body: "ہر دکان کے لیے پرنٹ کے قابل لنک اور QR کوڈ۔",
     feature3Title: "سمارٹ الرٹس",
     feature3Body: "گاہک کی باری قریب آنے پر آواز اور وائبریشن۔",
+    featuresKicker: "صف کیوں؟",
     newBadgeTag: "نیا",
     newBadgeText: "آپ کے لوگو اور رنگوں کے ساتھ مکمل برانڈ شناخت",
     statsTitle: "اعداد جو خود بولتے ہیں",
@@ -82,6 +85,13 @@ export const ur: Translations = {
       salon: "سیلون",
       other: "دیگر",
     },
+    status: {
+      waiting: "انتظار میں",
+      called: "بلایا گیا",
+      served: "خدمت مکمل",
+      cancelled: "منسوخ",
+      no_show: "حاضر نہیں ہوا",
+    },
   },
   queue: {
     joinTitle: "قطار میں شامل ہوں",
@@ -98,6 +108,9 @@ export const ur: Translations = {
     join: "ابھی شامل ہوں",
     shopClosed: "دکان اس وقت بند ہے",
     closedHint: "دوبارہ کھلنے کا وقت جاننے کے لیے بعد میں چیک کریں۔",
+    openNow: "ابھی کھلا ہے",
+    closedNow: "بند",
+    adBanner: "اپنی دکان کو Pro پر اپ گریڈ کریں — بغیر اشتہارات + ریموٹ بکنگ",
     yourNumber: "آپ کا قطار نمبر",
     peopleAhead: "آپ سے آگے",
     person: "لوگ",

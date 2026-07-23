@@ -1,4 +1,5 @@
 import { Navigate, Route, Routes } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "./lib/auth";
 import { LandingPage } from "./pages/LandingPage";
 import { RegisterPage } from "./pages/RegisterPage";
@@ -11,11 +12,13 @@ import { BookingPage } from "./pages/BookingPage";
 import { UnsubscribePage } from "./pages/UnsubscribePage";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const { t } = useTranslation();
   const { owner, loading } = useAuth();
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center text-brand-600">
-        جارٍ التحميل…
+      <div className="flex min-h-screen items-center justify-center gap-2 text-brand-600">
+        <span className="h-4 w-4 animate-spin rounded-full border-2 border-brand-300 border-t-brand-600" />
+        {t("common.loading")}
       </div>
     );
   }

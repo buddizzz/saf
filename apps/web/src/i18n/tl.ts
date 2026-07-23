@@ -10,6 +10,8 @@ export const tl: Translations = {
     back: "Bumalik",
   },
   landing: {
+    heroKicker: "Platform sa pamamahala ng pila",
+    marqueeTitle: "Para sa lahat ng uri ng negosyo",
     heroTitle: "Ayusin nang madali ang pila ng iyong customer",
     heroSubtitle:
       "Gumawa ng QR code para sa iyong tindahan, pamahalaan ang waiting list nang real time, at bigyan ang mga customer ng maayos na paghihintay na may instant alert.",
@@ -21,6 +23,7 @@ export const tl: Translations = {
     feature2Body: "Nai-print na link at QR code para sa bawat tindahan.",
     feature3Title: "Matalinong alert",
     feature3Body: "Tunog at vibration kapag papalapit na ang turn ng customer.",
+    featuresKicker: "Bakit SAF?",
     newBadgeTag: "Bago",
     newBadgeText: "Kumpletong brand identity gamit ang logo at kulay mo",
     statsTitle: "Mga numero na nagsasalita para sa kanilang sarili",
@@ -82,6 +85,13 @@ export const tl: Translations = {
       salon: "Salon",
       other: "Iba pa",
     },
+    status: {
+      waiting: "Naghihintay",
+      called: "Tinawag",
+      served: "Naserbisyuhan",
+      cancelled: "Kanselado",
+      no_show: "Hindi dumating",
+    },
   },
   queue: {
     joinTitle: "Sumali sa pila",
@@ -98,6 +108,9 @@ export const tl: Translations = {
     join: "Sumali ngayon",
     shopClosed: "Sarado ang tindahan sa ngayon",
     closedHint: "Bumalik mamaya para makita kung kailan kami muling magbubukas.",
+    openNow: "Bukas ngayon",
+    closedNow: "Sarado",
+    adBanner: "I-upgrade ang shop mo sa Pro — walang ads + remote booking",
     yourNumber: "Numero mo sa pila",
     peopleAhead: "Nasa unahan mo",
     person: "tao",

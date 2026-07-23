@@ -10,6 +10,8 @@ export const id: Translations = {
     back: "Kembali",
   },
   landing: {
+    heroKicker: "Platform manajemen antrean",
+    marqueeTitle: "Dibuat untuk semua jenis usaha",
     heroTitle: "Atur antrean pelanggan Anda dengan mudah",
     heroSubtitle:
       "Buat kode QR untuk toko Anda, kelola daftar tunggu secara real time, dan berikan pelanggan pengalaman menunggu yang nyaman dengan peringatan instan.",
@@ -21,6 +23,7 @@ export const id: Translations = {
     feature2Body: "Tautan dan kode QR yang siap cetak untuk setiap toko.",
     feature3Title: "Peringatan cerdas",
     feature3Body: "Suara dan getaran saat giliran pelanggan mendekat.",
+    featuresKicker: "Mengapa SAF?",
     newBadgeTag: "Baru",
     newBadgeText: "Identitas merek lengkap dengan logo dan warna Anda",
     statsTitle: "Angka yang berbicara sendiri",
@@ -82,6 +85,13 @@ export const id: Translations = {
       salon: "Salon",
       other: "Lainnya",
     },
+    status: {
+      waiting: "Menunggu",
+      called: "Dipanggil",
+      served: "Selesai dilayani",
+      cancelled: "Dibatalkan",
+      no_show: "Tidak hadir",
+    },
   },
   queue: {
     joinTitle: "Gabung antrean",
@@ -98,6 +108,9 @@ export const id: Translations = {
     join: "Gabung sekarang",
     shopClosed: "Toko saat ini tutup",
     closedHint: "Periksa kembali untuk melihat kapan kami buka lagi.",
+    openNow: "Buka sekarang",
+    closedNow: "Tutup",
+    adBanner: "Upgrade toko Anda ke Pro — tanpa iklan + booking jarak jauh",
     yourNumber: "Nomor antrean Anda",
     peopleAhead: "Di depan Anda",
     person: "orang",

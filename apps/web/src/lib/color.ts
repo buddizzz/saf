@@ -35,13 +35,6 @@ export function darken(hex: string, amount: number): string {
   return rgbToHex(r * (1 - amount), g * (1 - amount), b * (1 - amount));
 }
 
-// يحدّد إن كان اللون فاتحًا (لاختيار لون نص أبيض/أسود متباين فوقه).
-export function isLightColor(hex: string): boolean {
-  const [r, g, b] = hexToRgb(hex);
-  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-  return luminance > 0.6;
-}
-
 export function isValidHex(hex: string): boolean {
   return /^#[0-9a-fA-F]{6}$/.test(hex);
 }

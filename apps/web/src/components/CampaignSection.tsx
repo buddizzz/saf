@@ -331,7 +331,7 @@ export function CampaignSection({ shop }: { shop: Shop }) {
                 {t("campaigns.gender")}
               </span>
               <select
-                className="input"
+                className="field"
                 value={gender}
                 onChange={(e) => setGender(e.target.value)}
               >
@@ -345,7 +345,7 @@ export function CampaignSection({ shop }: { shop: Shop }) {
                 {t("campaigns.age")}
               </span>
               <select
-                className="input"
+                className="field"
                 value={age}
                 onChange={(e) => setAge(e.target.value)}
               >
@@ -406,7 +406,7 @@ export function CampaignSection({ shop }: { shop: Shop }) {
               {t("campaigns.campaignName")}
             </span>
             <input
-              className="input"
+              className="field"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder={t("campaigns.defaultName")}
@@ -418,7 +418,7 @@ export function CampaignSection({ shop }: { shop: Shop }) {
               {t("campaigns.message")}
             </span>
             <textarea
-              className="input min-h-[120px]"
+              className="field min-h-[120px]"
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               required
