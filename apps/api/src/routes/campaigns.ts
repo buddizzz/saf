@@ -14,6 +14,14 @@ import {
   type TargetingJson,
 } from "../lib/campaigns";
 import { debitBalance, ensureShopBalance } from "../lib/billing";
+import {
+  AUTOMATION_DEFAULTS,
+  AUTOMATION_INTERVAL_DAYS,
+  getShopAutomations,
+  upsertShopAutomation,
+  type AutomationConfig,
+  type AutomationKind,
+} from "../lib/automations";
 import { rateLimit } from "../lib/rate-limit";
 
 export const campaignRoutes = new Hono<AppEnv>();
@@ -410,5 +418,93 @@ campaignRoutes.post(
     const result = await dispatchCampaign(c.env, campaign.id);
     const bal = await ensureShopBalance(c.env.DB, shop.id);
     return c.json({ status: "completed", ...result, balance: bal.balance });
+  },
+);
+
+// أتمتة التسويق (مرحلة «بعد الشراء» من خطة التسويق من صفحة واحدة):
+// winback (استرجاع الغائبين) / vip (كبار العملاء) / referral (التوصيات).
+campaignRoutes.get("/:shopId/automations", requireAuth, async (c) => {
+  const shop = await loadOwnedShop(c, c.req.param("shopId"));
+  if (!shop) return c.json({ error: "غير مصرّح" }, 403);
+
+  const automations = await getShopAutomations(c.env.DB, shop.id);
+  return c.json({
+    automations: automations.map((a) => ({
+      automation: a.automation,
+      // التوافق الخلفي: التذكير الشهري القديم = winback مفعّلة
+      enabled:
+        a.enabled ||
+        (a.automation === "winback" && shop.monthly_reminders_enabled === 1),
+      config: a.config,
+      defaults: AUTOMATION_DEFAULTS[a.automation],
+      interval_days: AUTOMATION_INTERVAL_DAYS[a.automation],
+    })),
+    reminder_quota: 400,
+    reminder_quota_used: shop.monthly_reminder_quota_used ?? 0,
+    price_per_message: CAMPAIGN_PRICES.past_customers,
+  });
+});
+
+campaignRoutes.put(
+  "/:shopId/automations/:automation",
+  requireAuth,
+  async (c) => {
+    const shop = await loadOwnedShop(c, c.req.param("shopId"));
+    if (!shop) return c.json({ error: "غير مصرّح" }, 403);
+
+    const kind = c.req.param("automation") as AutomationKind;
+    if (!(kind in AUTOMATION_DEFAULTS)) {
+      return c.json({ error: "نوع الأتمتة غير معروف" }, 400);
+    }
+
+    const body = await c.req.json().catch(() => ({}));
+    const enabled = body.enabled === true || body.enabled === 1;
+
+    // التفعيل حصري لباقة Pro؛ الإيقاف متاح دائمًا
+    if (enabled) {
+      const proErr = await assertProShop(shop);
+      if (proErr) return c.json({ error: proErr }, 403);
+    }
+
+    const config: AutomationConfig = {};
+    if (kind === "winback" && body.days != null) {
+      const days = Math.round(Number(body.days));
+      if (!Number.isFinite(days) || days < 7 || days > 365) {
+        return c.json({ error: "أيام الغياب يجب أن تكون بين 7 و 365" }, 400);
+      }
+      config.days = days;
+    }
+    if (kind === "vip" && body.min_visits != null) {
+      const minVisits = Math.round(Number(body.min_visits));
+      if (!Number.isFinite(minVisits) || minVisits < 2 || minVisits > 50) {
+        return c.json({ error: "حد الزيارات يجب أن يكون بين 2 و 50" }, 400);
+      }
+      config.min_visits = minVisits;
+    }
+    if (typeof body.message === "string" && body.message.trim()) {
+      const message = body.message.trim();
+      if (message.length > 1000) {
+        return c.json({ error: "الرسالة طويلة جدًا (1000 حرف كحد أقصى)" }, 400);
+      }
+      config.message = message;
+    }
+
+    await upsertShopAutomation(c.env.DB, shop.id, kind, enabled, config);
+
+    // إيقاف winback يوقف أيضًا التذكير الشهري القديم حتى لا يستمر الإرسال
+    if (kind === "winback" && !enabled && shop.monthly_reminders_enabled === 1) {
+      await c.env.DB.prepare(
+        `UPDATE shops SET monthly_reminders_enabled = 0 WHERE id = ?`,
+      )
+        .bind(shop.id)
+        .run();
+    }
+
+    return c.json({
+      automation: kind,
+      enabled,
+      config,
+      defaults: AUTOMATION_DEFAULTS[kind],
+    });
   },
 );

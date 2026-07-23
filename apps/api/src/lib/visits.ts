@@ -102,6 +102,10 @@ export interface AudienceFilters {
   limit?: number;
   /** فقط لعملاء سابقين: آخر زيارة قبل N يوم */
   daysSinceLastVisit?: number | null;
+  /** أتمتة VIP: عدد زيارات أدنى */
+  minVisits?: number | null;
+  /** أتمتة التوصيات: قيّم 4+ نجوم خلال آخر N يوم */
+  ratedHighSinceDays?: number | null;
 }
 
 /** عملاء سابقون لمحل معيّن (مع موافقة تسويق) — لحملة "عملاء سابقون". */
@@ -132,6 +136,23 @@ export async function listPastCustomers(
       Number(filters.daysSinceLastVisit) * 86400;
     clauses.push("v.last_visit_at <= ?");
     binds.push(cutoff);
+  }
+  if (filters.minVisits != null) {
+    clauses.push("v.visit_count >= ?");
+    binds.push(Number(filters.minVisits));
+  }
+  if (filters.ratedHighSinceDays != null) {
+    const since =
+      Math.floor(Date.now() / 1000) -
+      Number(filters.ratedHighSinceDays) * 86400;
+    clauses.push(
+      `EXISTS (
+         SELECT 1 FROM queue_entries q
+         WHERE q.phone = v.phone AND q.shop_id = v.shop_id
+           AND q.rating >= 4 AND q.completed_at >= ?
+       )`,
+    );
+    binds.push(since);
   }
 
   binds.push(limit);

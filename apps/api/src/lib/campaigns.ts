@@ -20,6 +20,10 @@ export interface TargetingJson {
   age_category?: string | null;
   exclude_existing?: boolean;
   days_since_last_visit?: number | null;
+  /** أتمتة VIP: عدد زيارات أدنى */
+  min_visits?: number | null;
+  /** أتمتة التوصيات: قيّم 4+ نجوم خلال آخر N يوم */
+  rated_high_since_days?: number | null;
 }
 
 export function priceForAudience(type: AudienceType): number {
@@ -196,6 +200,8 @@ export async function resolveAudiencePhones(
         : null,
     limit: 5000,
     daysSinceLastVisit: targeting.days_since_last_visit ?? null,
+    minVisits: targeting.min_visits ?? null,
+    ratedHighSinceDays: targeting.rated_high_since_days ?? null,
   };
 
   const rows =

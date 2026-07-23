@@ -223,8 +223,9 @@ shopRoutes.post("/", requireAuth, async (c) => {
     `INSERT INTO shops
       (id, owner_id, name, slug, shop_type, country_code, city_id, district_id,
        district_name_free, lat, lng, working_hours,
-       osm_place_id, osm_display_name, location_source, location_updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       osm_place_id, osm_display_name, location_source, location_updated_at,
+       last_activity_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, unixepoch())`,
   )
     .bind(
       id,
@@ -488,6 +489,8 @@ shopRoutes.patch("/:id", requireAuth, async (c) => {
   if (updates.length === 0) {
     return c.json({ error: "لا توجد حقول للتحديث" }, 400);
   }
+
+  updates.push("last_activity_at = unixepoch()");
 
   values.push(id);
   await c.env.DB.prepare(`UPDATE shops SET ${updates.join(", ")} WHERE id = ?`)

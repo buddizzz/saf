@@ -4,6 +4,7 @@ import { isValidSaudiPhone, requireFields } from "../lib/http";
 import { isWithinWorkingHours } from "../lib/hours";
 import { requireAuth } from "../middleware/auth";
 import { encryptPhone } from "../lib/phone-crypto";
+import { touchShopActivity } from "../lib/activity";
 import { clientIp, rateLimit } from "../lib/rate-limit";
 import {
   callNext,
@@ -97,6 +98,7 @@ queueRoutes.post("/join", async (c) => {
     phoneCipher,
   });
 
+  await touchShopActivity(c.env.DB, shop.id);
   await stubFor(c, shop.id).broadcast(shop.id);
   const snapshot = await getSnapshot(c.env.DB, shop.id);
 
@@ -165,6 +167,7 @@ queueRoutes.post("/:shopId/next", requireAuth, async (c) => {
   if (!(await canControlShop(c, auth, shopId))) {
     return c.json({ error: "غير مصرّح لهذا المحل" }, 403);
   }
+  await touchShopActivity(c.env.DB, shopId);
   const number = await callNext(c.env.DB, shopId);
   if (number === null) {
     await stubFor(c, shopId).broadcast(shopId);
@@ -181,6 +184,7 @@ queueRoutes.post("/:shopId/skip", requireAuth, async (c) => {
   if (!(await canControlShop(c, auth, shopId))) {
     return c.json({ error: "غير مصرّح لهذا المحل" }, 403);
   }
+  await touchShopActivity(c.env.DB, shopId);
   await skipCurrent(c.env.DB, shopId, "cancelled");
   await stubFor(c, shopId).broadcast(shopId);
   return c.json({ ok: true });
@@ -193,6 +197,7 @@ queueRoutes.post("/:shopId/complete", requireAuth, async (c) => {
   if (!(await canControlShop(c, auth, shopId))) {
     return c.json({ error: "غير مصرّح لهذا المحل" }, 403);
   }
+  await touchShopActivity(c.env.DB, shopId);
   await completeCurrent(c.env.DB, shopId);
   await stubFor(c, shopId).broadcast(shopId);
   return c.json({ ok: true });
