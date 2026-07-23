@@ -18,10 +18,17 @@ export function DashboardPage() {
   const [shops, setShops] = useState<Shop[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [canCreateShop, setCanCreateShop] = useState(true);
+  const [openSettingsToken, setOpenSettingsToken] = useState(0);
 
   const loadShops = async () => {
-    const res = await apiFetch<{ shops: Shop[] }>("/shops", { auth: true });
+    const res = await apiFetch<{
+      shops: Shop[];
+      can_create_shop?: boolean;
+      has_pro?: boolean;
+    }>("/shops", { auth: true });
     setShops(res.shops);
+    setCanCreateShop(res.can_create_shop ?? res.shops.length === 0);
     setSelectedId((prev) => prev ?? res.shops[0]?.id ?? null);
     setLoading(false);
   };
@@ -91,14 +98,30 @@ export function DashboardPage() {
                   <span className="truncate">{shop.name}</span>
                 </button>
               ))}
-              <CreateShopInline onCreated={loadShops} />
+              <CreateShopInline
+                canCreate={canCreateShop}
+                onCreated={loadShops}
+                onUpgrade={() => {
+                  const first = shops[0];
+                  if (first) setSelectedId(first.id);
+                  setOpenSettingsToken((n) => n + 1);
+                }}
+              />
             </aside>
             {selected && (
-              <ShopManager
-                key={selected.id}
-                shop={selected}
-                onChange={loadShops}
-              />
+              <div className="space-y-4">
+                {!canCreateShop && (
+                  <div className="rounded-2xl border border-gold-200 bg-gradient-to-br from-gold-50 to-white px-4 py-3 text-sm font-bold text-brand-800">
+                    {t("dashboard.shopLimitReached")}
+                  </div>
+                )}
+                <ShopManager
+                  key={`${selected.id}-${openSettingsToken}`}
+                  shop={selected}
+                  onChange={loadShops}
+                  initialSettingsOpen={!canCreateShop || openSettingsToken > 0}
+                />
+              </div>
             )}
           </div>
         )}
@@ -108,11 +131,19 @@ export function DashboardPage() {
   );
 }
 
-function ShopManager({ shop, onChange }: { shop: Shop; onChange: () => void }) {
+function ShopManager({
+  shop,
+  onChange,
+  initialSettingsOpen = false,
+}: {
+  shop: Shop;
+  onChange: () => void;
+  initialSettingsOpen?: boolean;
+}) {
   const { t } = useTranslation();
   const { snapshot } = useQueueWebSocket(shop.id);
   const [accepting, setAccepting] = useState(shop.is_accepting_queue === 1);
-  const [showSettings, setShowSettings] = useState(false);
+  const [showSettings, setShowSettings] = useState(initialSettingsOpen);
   const wake = useWakeLock(true);
   const customerUrl = `${location.origin}/q/${shop.slug}`;
   const [copied, setCopied] = useState(false);
@@ -314,9 +345,30 @@ function StatusPill({ status }: { status: string }) {
   );
 }
 
-function CreateShopInline({ onCreated }: { onCreated: () => void }) {
+function CreateShopInline({
+  onCreated,
+  canCreate,
+  onUpgrade,
+}: {
+  onCreated: () => void;
+  canCreate: boolean;
+  onUpgrade: () => void;
+}) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
+
+  if (!canCreate) {
+    return (
+      <button
+        type="button"
+        className="w-full rounded-xl border border-dashed border-gold-300 bg-gold-50 px-4 py-3 text-sm font-bold text-brand-800 hover:bg-gold-100"
+        onClick={onUpgrade}
+      >
+        {t("dashboard.upgradeForShops")}
+      </button>
+    );
+  }
+
   if (!open) {
     return (
       <button
@@ -362,6 +414,7 @@ function CreateShopForm({
     region_id: "",
     city_id: "",
     district_id: "",
+    commercial_registration: "",
   });
   const [regions, setRegions] = useState<Location[]>([]);
   const [cities, setCities] = useState<Location[]>([]);
@@ -413,6 +466,12 @@ function CreateShopForm({
     e.preventDefault();
     setBusy(true);
     setError(null);
+    const cr = form.commercial_registration.replace(/\D/g, "");
+    if (!/^\d{10}$/.test(cr)) {
+      setError(t("dashboard.commercialRegistrationInvalid"));
+      setBusy(false);
+      return;
+    }
     setGeoHint(t("location.locating"));
     try {
       const live = coords ?? (await readDeviceCoords());
@@ -428,6 +487,7 @@ function CreateShopForm({
           country_code: form.country_code,
           city_id: form.city_id || null,
           district_id: form.district_id || null,
+          commercial_registration: cr,
           lat: live?.lat ?? null,
           lng: live?.lng ?? null,
         }),
@@ -460,6 +520,30 @@ function CreateShopForm({
           onChange={(e) => setForm({ ...form, name: e.target.value })}
           required
         />
+      </div>
+      <div>
+        <label className="label">
+          {t("dashboard.commercialRegistration")}
+        </label>
+        <input
+          className="field"
+          inputMode="numeric"
+          autoComplete="off"
+          placeholder="1010XXXXXX"
+          maxLength={14}
+          value={form.commercial_registration}
+          onChange={(e) =>
+            setForm({
+              ...form,
+              commercial_registration: e.target.value.replace(/[^\d]/g, ""),
+            })
+          }
+          required
+          dir="ltr"
+        />
+        <p className="mt-1 text-xs text-slate-400">
+          {t("dashboard.commercialRegistrationHint")}
+        </p>
       </div>
       <div>
         <label className="label">{t("dashboard.shopType")}</label>
