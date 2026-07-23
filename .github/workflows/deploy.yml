@@ -19,6 +19,14 @@
 #   ENVIRONMENT=production
 #   ALLOWED_ORIGINS=https://safapp.net,https://www.safapp.net,https://admin.safapp.net
 #   PUBLIC_WEB_ORIGIN=https://safapp.net
+#
+# متغير مستودع GitHub (Settings → Actions → Variables) لبناء الواجهات:
+#   API_BASE_URL=https://api.safapp.net
+# (بدونه، الواجهات المبنية للإنتاج تستخدم /api النسبي الذي لا يعمل إلا
+#  خلف بروكسي Vite في التطوير — لازم لأن الـ Worker والـ Pages على نطاقين مختلفين)
+#
+# نطاق مخصص للـ Worker (Cloudflare Dashboard → Workers → saf-api → Custom Domains):
+#   api.safapp.net → يجب أن يطابق API_BASE_URL أعلاه
 
 name: "Deploy SAF"
 
@@ -69,6 +77,8 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @saf/web build
+        env:
+          VITE_API_BASE: ${{ vars.API_BASE_URL }}
       - name: Deploy Pages (safapp.net)
         uses: cloudflare/wrangler-action@v3
         with:
@@ -91,6 +101,8 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @saf/admin build
+        env:
+          VITE_API_BASE: ${{ vars.API_BASE_URL }}
       - name: Deploy Pages (admin.safapp.net)
         uses: cloudflare/wrangler-action@v3
         with:

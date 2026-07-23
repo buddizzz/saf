@@ -1,5 +1,8 @@
-// عميل HTTP بسيط يتعامل مع الـ Worker عبر البروكسي (/api) ويرفق رمز الدخول.
-const BASE = "/api";
+// عميل HTTP بسيط يتعامل مع الـ Worker ويرفق رمز الدخول.
+// في التطوير: يمرّ عبر بروكسي Vite (/api). في الإنتاج: يجب ضبط
+// VITE_API_BASE على رابط الـ Worker الكامل (مثل https://api.safapp.net)
+// لأن الواجهة والـ API ينشران على نطاقين مختلفين على Cloudflare Pages/Workers.
+const BASE = (import.meta.env.VITE_API_BASE ?? "/api").replace(/\/$/, "");
 const TOKEN_KEY = "saf.token";
 
 export function getToken(): string | null {
@@ -74,8 +77,13 @@ export function assetUrl(path: string | null | undefined): string | null {
   return `${BASE}${path}`;
 }
 
-// عنوان الـ WebSocket للطابور (يمرّ عبر بروكسي Vite في التطوير).
+// عنوان الـ WebSocket للطابور. في التطوير يمرّ عبر بروكسي Vite على نفس
+// المنفذ. في الإنتاج يُبنى من VITE_API_BASE (نطاق الـ Worker المنفصل).
 export function queueWsUrl(shopId: string): string {
+  if (/^https?:\/\//.test(BASE)) {
+    const wsBase = BASE.replace(/^http/, "ws");
+    return `${wsBase}/queue/${shopId}/ws?shopId=${shopId}`;
+  }
   const proto = location.protocol === "https:" ? "wss" : "ws";
-  return `${proto}://${location.host}/api/queue/${shopId}/ws?shopId=${shopId}`;
+  return `${proto}://${location.host}${BASE}/queue/${shopId}/ws?shopId=${shopId}`;
 }
