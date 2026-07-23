@@ -43,8 +43,58 @@ const ArrowIcon = (
   </svg>
 );
 
+
+const CheckIcon = (
+  <svg
+    width={16}
+    height={16}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={2.5}
+    className="shrink-0 text-emerald-600"
+  >
+    <path d="M5 12l5 5L20 7" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
+const ProCheckIcon = (
+  <svg
+    width={16}
+    height={16}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={2.5}
+    className="shrink-0 text-gold-300"
+  >
+    <path d="M5 12l5 5L20 7" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
 export function LandingPage() {
   const { t } = useTranslation();
+
+  const freeFeatures = [
+    t("landing.freeFeat1"),
+    t("landing.freeFeat2"),
+    t("landing.freeFeat3"),
+    t("landing.freeFeat4"),
+    t("landing.freeFeat5"),
+    t("landing.freeFeat6"),
+  ];
+
+  const proFeatures = [
+    t("landing.proFeat1"),
+    t("landing.proFeat2"),
+    t("landing.proFeat3"),
+    t("landing.proFeat4"),
+    t("landing.proFeat5"),
+    t("landing.proFeat6"),
+    t("landing.proFeat7"),
+    t("landing.proFeat8"),
+  ];
+
   return (
     <div className="relative min-h-screen overflow-hidden">
       <BackgroundOrbs />
@@ -54,6 +104,9 @@ export function LandingPage() {
           <Logo size={36} />
           <div className="flex items-center gap-2 sm:gap-3">
             <LanguageSwitcher />
+            <a href="#pricing" className="hidden font-bold text-brand-700 transition hover:text-brand-500 sm:inline">
+              {t("landing.pricingNav")}
+            </a>
             <Link to="/login" className="hidden font-bold text-brand-700 transition hover:text-brand-500 sm:inline">
               {t("landing.ctaLogin")}
             </Link>
@@ -101,10 +154,13 @@ export function LandingPage() {
                   {t("landing.ctaOwner")}
                   {ArrowIcon}
                 </Link>
-                <Link to="/login" className="btn-ghost">
-                  {t("landing.ctaLogin")}
-                </Link>
+                <a href="#pricing" className="btn-ghost">
+                  {t("landing.ctaCompare")}
+                </a>
               </div>
+              <p className="mt-4 text-sm font-medium text-brand-900/50">
+                {t("landing.freeStartHint")}
+              </p>
             </Reveal>
           </div>
           <Reveal delay={250} className="relative">
@@ -134,6 +190,106 @@ export function LandingPage() {
                 />
               </Reveal>
             ))}
+          </div>
+        </section>
+
+
+        {/* الباقات — مجاني مقابل Pro */}
+        <section id="pricing" className="scroll-mt-28 px-6 py-20 md:py-28">
+          <div className="mx-auto max-w-6xl">
+            <Reveal>
+              <div className="mb-12 text-center">
+                <span className="kicker mb-4 inline-flex justify-center">
+                  <span className="h-px w-8 bg-gold-400" />
+                  {t("landing.pricingKicker")}
+                </span>
+                <h2 className="text-3xl font-black text-brand-950 md:text-4xl">
+                  {t("landing.pricingTitle")}
+                </h2>
+                <p className="mx-auto mt-3 max-w-xl text-brand-900/60">
+                  {t("landing.pricingSubtitle")}
+                </p>
+              </div>
+            </Reveal>
+
+            <div className="grid gap-6 lg:grid-cols-2">
+              <Reveal>
+                <div className="relative flex h-full flex-col rounded-[2rem] border border-brand-900/10 bg-white p-8 shadow-card">
+                  <div className="mb-1 text-sm font-extrabold text-brand-900/50">
+                    {t("landing.freePlanName")}
+                  </div>
+                  <div className="mb-2 flex items-baseline gap-2">
+                    <span className="text-4xl font-black text-brand-950">
+                      {t("landing.freePrice")}
+                    </span>
+                    <span className="text-sm font-bold text-brand-900/40">
+                      {t("landing.forever")}
+                    </span>
+                  </div>
+                  <p className="mb-6 text-sm leading-relaxed text-brand-900/60">
+                    {t("landing.freePlanDesc")}
+                  </p>
+                  <ul className="mb-8 flex-1 space-y-3">
+                    {freeFeatures.map((item) => (
+                      <li
+                        key={item}
+                        className="flex items-start gap-2.5 text-sm font-medium text-brand-900"
+                      >
+                        {CheckIcon}
+                        <span>{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <Link to="/register" className="btn-ghost w-full">
+                    {t("landing.ctaFree")}
+                  </Link>
+                </div>
+              </Reveal>
+
+              <Reveal delay={120}>
+                <div className="relative flex h-full flex-col overflow-hidden rounded-[2rem] bg-gradient-to-br from-brand-950 via-brand-900 to-brand-800 p-8 text-white shadow-soft ring-2 ring-gold-400/50">
+                  <div className="pointer-events-none absolute -end-10 -top-10 h-40 w-40 rounded-full bg-gold-400/20 blur-3xl" />
+                  <div className="relative mb-4 inline-flex w-fit items-center gap-1.5 rounded-full bg-gold-400 px-3 py-1 text-xs font-extrabold text-brand-950">
+                    {t("landing.proBadge")}
+                  </div>
+                  <div className="relative mb-1 text-sm font-extrabold text-brand-100">
+                    {t("landing.proPlanName")}
+                  </div>
+                  <div className="relative mb-2 flex flex-wrap items-baseline gap-2">
+                    <span className="text-4xl font-black text-white">
+                      {t("landing.proPrice")}
+                    </span>
+                    <span className="text-sm font-bold text-brand-200">
+                      {t("landing.perMonth")}
+                    </span>
+                  </div>
+                  <p className="relative mb-1 text-sm text-gold-200">
+                    {t("landing.proYearlyHint")}
+                  </p>
+                  <p className="relative mb-6 text-sm leading-relaxed text-brand-100/80">
+                    {t("landing.proPlanDesc")}
+                  </p>
+                  <ul className="relative mb-8 flex-1 space-y-3">
+                    {proFeatures.map((item) => (
+                      <li
+                        key={item}
+                        className="flex items-start gap-2.5 text-sm font-medium text-white"
+                      >
+                        <span className="mt-0.5">{ProCheckIcon}</span>
+                        <span>{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <Link to="/register" className="btn-gold relative w-full group">
+                    {t("landing.ctaPro")}
+                    {ArrowIcon}
+                  </Link>
+                  <p className="relative mt-3 text-center text-xs text-brand-200">
+                    {t("landing.trialHint")}
+                  </p>
+                </div>
+              </Reveal>
+            </div>
           </div>
         </section>
 

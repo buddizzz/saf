@@ -193,7 +193,9 @@ export function SubscriptionSection({
             {t("subscription.upgradePitch")}
           </p>
           <ul className="space-y-1 text-sm text-slate-600">
+            <li>• {t("subscription.featShops")}</li>
             <li>• {t("subscription.featBooking")}</li>
+            <li>• {t("subscription.featCampaigns")}</li>
             <li>• {t("subscription.featThemes")}</li>
             <li>• {t("subscription.featSlug")}</li>
             <li>• {t("subscription.featAds")}</li>

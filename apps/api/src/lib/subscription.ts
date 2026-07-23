@@ -12,7 +12,22 @@ export const PRICING = {
 
 export const FREE_STAFF_LIMIT = 1;
 export const PRO_STAFF_LIMIT = 10;
+/** الباقة المجانية: محل واحد فقط. Pro يفتح محلات إضافية. */
+export const FREE_SHOP_LIMIT = 1;
 export const FREE_THEME_IDS = new Set(["modern"]);
+
+/** رقم السجل التجاري السعودي: 10 أرقام. */
+export function normalizeCommercialRegistration(
+  raw: unknown,
+): string | null {
+  if (raw == null) return null;
+  const digits = String(raw).replace(/\D/g, "");
+  return digits || null;
+}
+
+export function isValidCommercialRegistration(cr: string): boolean {
+  return /^\d{10}$/.test(cr);
+}
 
 export interface ShopSubscriptionFields {
   subscription_tier: string;

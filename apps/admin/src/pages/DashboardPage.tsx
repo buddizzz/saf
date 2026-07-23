@@ -34,6 +34,7 @@ interface ShopRow {
   suspended_at: number | null;
   suspend_reason: string | null;
   created_at: number;
+  commercial_registration?: string | null;
   city_id?: string | null;
   district_id?: string | null;
   lat?: number | null;
@@ -548,6 +549,11 @@ export function DashboardPage() {
                       <div className="font-mono text-xs text-ink-700/60" dir="ltr">
                         /{shop.slug}
                       </div>
+                      {shop.commercial_registration && (
+                        <div className="mt-1 font-mono text-[11px] text-ink-700/55" dir="ltr">
+                          CR {shop.commercial_registration}
+                        </div>
+                      )}
                       {shop.osm_display_name && (
                         <div className="mt-1 max-w-[220px] truncate text-[11px] text-ink-700/50">
                           {shop.osm_display_name}

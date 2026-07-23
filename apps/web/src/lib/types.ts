@@ -36,6 +36,7 @@ export interface Shop {
   working_hours: string | null;
   logo_url: string | null;
   tagline: string | null;
+  commercial_registration?: string | null;
   country_code?: string | null;
   city_id?: string | null;
   district_id?: string | null;

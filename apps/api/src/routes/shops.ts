@@ -6,8 +6,12 @@ import { hashPassword } from "../lib/crypto";
 import { isWithinWorkingHours } from "../lib/hours";
 import {
   canUseTheme,
+  FREE_SHOP_LIMIT,
   isPro,
+  isValidCommercialRegistration,
+  normalizeCommercialRegistration,
   staffLimit,
+  type ShopSubscriptionFields,
 } from "../lib/subscription";
 import {
   distanceKm,
@@ -194,14 +198,82 @@ shopRoutes.get("/by-location", requireAuth, async (c) => {
   return c.json({ shops: shops.slice(0, limit), origin });
 });
 
+async function ownerHasProShop(
+  db: D1Database,
+  ownerId: string,
+): Promise<boolean> {
+  const { results } = await db
+    .prepare(
+      `SELECT subscription_tier, subscription_status, subscription_renews_at
+       FROM shops WHERE owner_id = ?`,
+    )
+    .bind(ownerId)
+    .all<ShopSubscriptionFields>();
+  return (results ?? []).some((s) => isPro(s));
+}
+
 // إنشاء محل جديد (يبدأ دائمًا على الباقة المجانية برابط عشوائي).
 shopRoutes.post("/", requireAuth, async (c) => {
   const auth = c.get("auth");
   const body = await c.req.json().catch(() => ({}));
-  const err = requireFields(body, ["name", "shop_type", "country_code"]);
+  const err = requireFields(body, [
+    "name",
+    "shop_type",
+    "country_code",
+    "commercial_registration",
+  ]);
   if (err) return c.json({ error: err }, 400);
   if (!SHOP_TYPES.includes(body.shop_type)) {
     return c.json({ error: "نوع المحل غير مدعوم" }, 400);
+  }
+
+  const cr = normalizeCommercialRegistration(body.commercial_registration);
+  if (!cr || !isValidCommercialRegistration(cr)) {
+    return c.json(
+      {
+        error: "رقم السجل التجاري غير صالح — يجب أن يكون 10 أرقام",
+        code: "INVALID_COMMERCIAL_REGISTRATION",
+      },
+      400,
+    );
+  }
+
+  const crTaken = await c.env.DB.prepare(
+    `SELECT id FROM shops WHERE commercial_registration = ?`,
+  )
+    .bind(cr)
+    .first();
+  if (crTaken) {
+    return c.json(
+      {
+        error: "هذا السجل التجاري مسجّل لمحل آخر",
+        code: "COMMERCIAL_REGISTRATION_TAKEN",
+      },
+      409,
+    );
+  }
+
+  // الباقة المجانية: محل واحد فقط. محلات إضافية تتطلب Pro على أحد محلات المالك.
+  const countRow = await c.env.DB.prepare(
+    `SELECT COUNT(*) AS n FROM shops WHERE owner_id = ?`,
+  )
+    .bind(auth.sub)
+    .first<{ n: number }>();
+  const shopCount = Number(countRow?.n ?? 0);
+  if (shopCount >= FREE_SHOP_LIMIT) {
+    const hasPro = await ownerHasProShop(c.env.DB, auth.sub);
+    if (!hasPro) {
+      return c.json(
+        {
+          error:
+            "الباقة المجانية تسمح بمحل واحد فقط. رقِّ إلى Pro لإضافة محلات إضافية.",
+          code: "SHOP_LIMIT_REACHED",
+          limit: FREE_SHOP_LIMIT,
+          upgrade_required: true,
+        },
+        403,
+      );
+    }
   }
 
   // توليد رابط عشوائي فريد (إعادة المحاولة عند التصادم النادر).
@@ -222,10 +294,10 @@ shopRoutes.post("/", requireAuth, async (c) => {
   await c.env.DB.prepare(
     `INSERT INTO shops
       (id, owner_id, name, slug, shop_type, country_code, city_id, district_id,
-       district_name_free, lat, lng, working_hours,
+       district_name_free, lat, lng, working_hours, commercial_registration,
        osm_place_id, osm_display_name, location_source, location_updated_at,
        last_activity_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, unixepoch())`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, unixepoch())`,
   )
     .bind(
       id,
@@ -240,6 +312,7 @@ shopRoutes.post("/", requireAuth, async (c) => {
       geo.lat,
       geo.lng,
       body.working_hours ? JSON.stringify(body.working_hours) : null,
+      cr,
       geo.osm_place_id,
       geo.osm_display_name,
       geo.location_source,
@@ -261,7 +334,18 @@ shopRoutes.get("/", requireAuth, async (c) => {
   )
     .bind(auth.sub)
     .all();
-  return c.json({ shops: results ?? [] });
+  const shops = results ?? [];
+  const hasPro = shops.some((s) =>
+    isPro(s as unknown as ShopSubscriptionFields),
+  );
+  const canCreateShop =
+    shops.length < FREE_SHOP_LIMIT || hasPro;
+  return c.json({
+    shops,
+    can_create_shop: canCreateShop,
+    free_shop_limit: FREE_SHOP_LIMIT,
+    has_pro: hasPro,
+  });
 });
 
 // معلومات عامة للمحل عبر الـ slug (لصفحة العميل).
