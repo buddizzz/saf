@@ -8,14 +8,14 @@
 #   1. أسرار مستودع GitHub (Settings → Secrets and variables → Actions → Secrets):
 #        CLOUDFLARE_API_TOKEN   — صلاحيات: D1 Edit + R2 Edit + Workers Scripts Edit + Pages Edit
 #        CLOUDFLARE_ACCOUNT_ID
-#   2. أسرار الـ Worker (لا تُرفع إلى Git، عبر: cd apps/api && wrangler login && ...):
-#        wrangler secret put JWT_SECRET --env production
-#        wrangler secret put PHONE_ENCRYPTION_KEY --env production
-#        wrangler secret put WHATSAPP_TOKEN --env production            # اختياري (حملات واتساب حقيقية)
-#        wrangler secret put WHATSAPP_PHONE_NUMBER_ID --env production  # اختياري
-#        wrangler secret put WHATSAPP_VERIFY_TOKEN --env production     # اختياري
-#        wrangler secret put WHATSAPP_TEMPLATE_NAME --env production    # اختياري
-#      (بدون JWT_SECRET / PHONE_ENCRYPTION_KEY لن يعمل تسجيل الدخول/التشفير في الإنتاج)
+#   2. JWT_SECRET و PHONE_ENCRYPTION_KEY يُولَّدان تلقائيًا عند أول تشغيل إن لم
+#      يكونا موجودين (لا حاجة لإضافتهما يدويًا). حملات واتساب الحقيقية تحتاج
+#      قيمًا فعلية من Meta — تبقى stub/log محليًا حتى تُضاف يدويًا:
+#        cd apps/api && wrangler login
+#        wrangler secret put WHATSAPP_TOKEN --env production
+#        wrangler secret put WHATSAPP_PHONE_NUMBER_ID --env production
+#        wrangler secret put WHATSAPP_VERIFY_TOKEN --env production
+#        wrangler secret put WHATSAPP_TEMPLATE_NAME --env production
 #   3. اختياري — متغير مستودع GitHub لنطاق مخصّص للـ API:
 #        Settings → Secrets and variables → Actions → Variables → API_BASE_URL=https://api.safapp.net
 #      بدونه، تُستخدم تلقائيًا رابط *.workers.dev الذي ينتجه هذا الـ workflow نفسه —
@@ -83,6 +83,28 @@ jobs:
           echo "$OUTPUT"
           URL=$(grep -Eo 'https://[a-zA-Z0-9.-]+\.workers\.dev' /tmp/deploy-worker.log | head -n1 || true)
           echo "worker_url=$URL" >> "$GITHUB_OUTPUT"
+
+      - name: Ensure required Worker secrets exist (auto-generate if missing)
+        run: |
+          set -euo pipefail
+          EXISTING=$(npx wrangler secret list --env production --format json)
+          has_secret() { echo "$EXISTING" | jq -e --arg n "$1" '.[] | select(.name==$n)' >/dev/null 2>&1; }
+          if has_secret "JWT_SECRET"; then
+            echo "JWT_SECRET already set."
+          else
+            echo "Generating JWT_SECRET…"
+            node -e "console.log(require('crypto').randomBytes(48).toString('hex'))" \
+              | npx wrangler secret put JWT_SECRET --env production
+          fi
+          if has_secret "PHONE_ENCRYPTION_KEY"; then
+            echo "PHONE_ENCRYPTION_KEY already set."
+          else
+            echo "Generating PHONE_ENCRYPTION_KEY…"
+            node -e "console.log(require('crypto').randomBytes(32).toString('hex'))" \
+              | npx wrangler secret put PHONE_ENCRYPTION_KEY --env production
+          fi
+          # أسرار واتساب اختيارية — تحتاج قيمًا حقيقية من Meta، لا تُولَّد تلقائيًا.
+          # أضفها يدويًا لاحقًا عند الحاجة: wrangler secret put WHATSAPP_TOKEN --env production
 
   deploy-web:
     runs-on: ubuntu-latest
