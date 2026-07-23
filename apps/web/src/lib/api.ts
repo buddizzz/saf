@@ -2,7 +2,7 @@
 // في التطوير: يمرّ عبر بروكسي Vite (/api). في الإنتاج: يجب ضبط
 // VITE_API_BASE على رابط الـ Worker الكامل (مثل https://api.safapp.net)
 // لأن الواجهة والـ API ينشران على نطاقين مختلفين على Cloudflare Pages/Workers.
-const BASE = (import.meta.env.VITE_API_BASE ?? "/api").replace(/\/$/, "");
+const BASE = (import.meta.env.VITE_API_BASE?.trim() || "/api").replace(/\/$/, "");
 const TOKEN_KEY = "saf.token";
 
 export function getToken(): string | null {

@@ -1,6 +1,6 @@
 // في التطوير يمرّ عبر بروكسي Vite (/api). في الإنتاج يجب ضبط VITE_API_BASE
 // على رابط الـ Worker الكامل (مثل https://api.safapp.net).
-const BASE = (import.meta.env.VITE_API_BASE ?? "/api").replace(/\/$/, "");
+const BASE = (import.meta.env.VITE_API_BASE?.trim() || "/api").replace(/\/$/, "");
 const TOKEN_KEY = "saf.admin.token";
 
 export function getAdminToken(): string | null {

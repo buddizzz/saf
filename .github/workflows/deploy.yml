@@ -1,32 +1,28 @@
 # نشر صفّ على Cloudflare (Workers + Pages)
 #
-# المتطلبات مرة واحدة:
-#   npx wrangler login
-#   أنشئ D1:   wrangler d1 create saf-db
-#   أنشئ R2:   wrangler r2 bucket create saf-brand-assets
-#   حدّث database_id في apps/api/wrangler.toml
+# هذا الـ workflow ذاتي التهيئة: عند أول تشغيل ينشئ قاعدة D1 وحاوية R2
+# ومشاريع Pages تلقائيًا إن لم تكن موجودة (باستخدام wrangler)، ويحدّث
+# database_id في wrangler.toml داخل بيئة التشغيل فقط (لا يُرفع لـ Git).
 #
-# أسرار الإنتاج (لا تُرفع إلى Git):
-#   cd apps/api
-#   wrangler secret put JWT_SECRET
-#   wrangler secret put PHONE_ENCRYPTION_KEY
-#   wrangler secret put WHATSAPP_TOKEN
-#   wrangler secret put WHATSAPP_PHONE_NUMBER_ID
-#   wrangler secret put WHATSAPP_VERIFY_TOKEN
-#   wrangler secret put WHATSAPP_TEMPLATE_NAME   # اختياري
-#
-# متغيرات الإنتاج المقترحة في [env.production.vars]:
-#   ENVIRONMENT=production
-#   ALLOWED_ORIGINS=https://safapp.net,https://www.safapp.net,https://admin.safapp.net
-#   PUBLIC_WEB_ORIGIN=https://safapp.net
-#
-# متغير مستودع GitHub (Settings → Actions → Variables) لبناء الواجهات:
-#   API_BASE_URL=https://api.safapp.net
-# (بدونه، الواجهات المبنية للإنتاج تستخدم /api النسبي الذي لا يعمل إلا
-#  خلف بروكسي Vite في التطوير — لازم لأن الـ Worker والـ Pages على نطاقين مختلفين)
-#
-# نطاق مخصص للـ Worker (Cloudflare Dashboard → Workers → saf-api → Custom Domains):
-#   api.safapp.net → يجب أن يطابق API_BASE_URL أعلاه
+# المطلوب مرة واحدة قبل أول تشغيل:
+#   1. أسرار مستودع GitHub (Settings → Secrets and variables → Actions → Secrets):
+#        CLOUDFLARE_API_TOKEN   — صلاحيات: D1 Edit + R2 Edit + Workers Scripts Edit + Pages Edit
+#        CLOUDFLARE_ACCOUNT_ID
+#   2. أسرار الـ Worker (لا تُرفع إلى Git، عبر: cd apps/api && wrangler login && ...):
+#        wrangler secret put JWT_SECRET --env production
+#        wrangler secret put PHONE_ENCRYPTION_KEY --env production
+#        wrangler secret put WHATSAPP_TOKEN --env production            # اختياري (حملات واتساب حقيقية)
+#        wrangler secret put WHATSAPP_PHONE_NUMBER_ID --env production  # اختياري
+#        wrangler secret put WHATSAPP_VERIFY_TOKEN --env production     # اختياري
+#        wrangler secret put WHATSAPP_TEMPLATE_NAME --env production    # اختياري
+#      (بدون JWT_SECRET / PHONE_ENCRYPTION_KEY لن يعمل تسجيل الدخول/التشفير في الإنتاج)
+#   3. اختياري — متغير مستودع GitHub لنطاق مخصّص للـ API:
+#        Settings → Secrets and variables → Actions → Variables → API_BASE_URL=https://api.safapp.net
+#      بدونه، تُستخدم تلقائيًا رابط *.workers.dev الذي ينتجه هذا الـ workflow نفسه —
+#      يعمل النشر بالكامل بدون أي نطاق مخصّص أو DNS.
+#   4. اختياري — لربط نطاق مخصص فعليًا: أضف نطاق safapp.net لحساب Cloudflare،
+#      ثم اربط Custom Domain على الـ Worker (api.safapp.net) وعلى مشاريع Pages
+#      (safapp.net لـ saf-web، admin.safapp.net لـ saf-admin) من لوحة Cloudflare.
 
 name: "Deploy SAF"
 
@@ -41,45 +37,77 @@ jobs:
     defaults:
       run:
         working-directory: apps/api
+    outputs:
+      worker_url: ${{ steps.deploy_worker.outputs.worker_url }}
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
-        with:
-          version: 10
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
         working-directory: .
+
+      - name: Ensure D1 database and R2 bucket exist
+        run: |
+          set -euo pipefail
+          DB_ID=$(npx wrangler d1 list --json | jq -r '.[] | select(.name=="saf-db") | .uuid' | head -n1)
+          if [ -z "$DB_ID" ]; then
+            echo "Creating D1 database saf-db…"
+            npx wrangler d1 create saf-db
+            DB_ID=$(npx wrangler d1 list --json | jq -r '.[] | select(.name=="saf-db") | .uuid' | head -n1)
+          fi
+          if [ -z "$DB_ID" ]; then
+            echo "::error::Could not determine D1 database id for saf-db" >&2
+            exit 1
+          fi
+          echo "Using D1 database id: $DB_ID"
+          sed -i "s/REPLACE_WITH_PRODUCTION_D1_ID/$DB_ID/" wrangler.toml
+
+          npx wrangler r2 bucket create saf-brand-assets \
+            || echo "R2 bucket saf-brand-assets already exists, continuing."
+
       - name: Apply D1 migrations (remote)
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: pnpm db:migrate:remote
+      - name: Seed Saudi locations dataset (remote, idempotent)
+        run: pnpm db:seed:remote
       - name: Deploy Worker
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: pnpm deploy
+        id: deploy_worker
+        run: |
+          set -euo pipefail
+          OUTPUT=$(pnpm deploy 2>&1 | tee /tmp/deploy-worker.log)
+          echo "$OUTPUT"
+          URL=$(grep -Eo 'https://[a-zA-Z0-9.-]+\.workers\.dev' /tmp/deploy-worker.log | head -n1 || true)
+          echo "worker_url=$URL" >> "$GITHUB_OUTPUT"
 
   deploy-web:
     runs-on: ubuntu-latest
     needs: deploy-api
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
-        with:
-          version: 10
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Ensure Pages project exists (saf-web)
+        run: |
+          npx wrangler pages project list --json | jq -e '.[] | select(.name=="saf-web")' >/dev/null \
+            || npx wrangler pages project create saf-web --production-branch=main \
+            || echo "Pages project create failed or already exists; continuing to deploy step."
+        working-directory: apps/web
       - run: pnpm --filter @saf/web build
         env:
-          VITE_API_BASE: ${{ vars.API_BASE_URL }}
-      - name: Deploy Pages (safapp.net)
+          VITE_API_BASE: ${{ vars.API_BASE_URL || needs.deploy-api.outputs.worker_url }}
+      - name: Deploy Pages (saf-web)
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -90,20 +118,27 @@ jobs:
   deploy-admin:
     runs-on: ubuntu-latest
     needs: deploy-api
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
-        with:
-          version: 10
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Ensure Pages project exists (saf-admin)
+        run: |
+          npx wrangler pages project list --json | jq -e '.[] | select(.name=="saf-admin")' >/dev/null \
+            || npx wrangler pages project create saf-admin --production-branch=main \
+            || echo "Pages project create failed or already exists; continuing to deploy step."
+        working-directory: apps/admin
       - run: pnpm --filter @saf/admin build
         env:
-          VITE_API_BASE: ${{ vars.API_BASE_URL }}
-      - name: Deploy Pages (admin.safapp.net)
+          VITE_API_BASE: ${{ vars.API_BASE_URL || needs.deploy-api.outputs.worker_url }}
+      - name: Deploy Pages (saf-admin)
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
